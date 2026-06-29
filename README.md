@@ -48,11 +48,11 @@ grid/plots, and Inspect AI + transformers/torch for the model probe.
 # [1] Build the input grid (deterministic). Female-only by default.
 python src/generate_grid.py --birth-years 1920 1960 1990 2024
 
-# [2] Probe a model. Laptop dev on a small Qwen (auto-downloads from HF hub);
-#     era_prior is the prompt variant that best surfaces cohort differences.
+# [2] Probe a model. Laptop dev on a small Qwen (auto-downloads from HF hub).
+#     The prompt is bare by default; ask the model for a decimal rate directly.
 inspect eval src/inspect_task.py@bpw \
     --model hf/Qwen/Qwen3-4B \
-    -T grid_path=$PWD/data/grid.csv -T prompt=era_prior \
+    -T grid_path=$PWD/data/grid.csv -T prompt=baseline \
     -M device=mps --log-dir logs
 
 # [3] Turn the newest .eval log into a plot-ready results.csv
@@ -64,8 +64,11 @@ python src/plot_results.py
 
 The large-model run on della uses the same task via SLURM — see
 `inspect/run_della.slurm`. To compare prompt framings, run step [2] per variant
-into `data/sweep/<variant>.csv` and plot the small-multiples with
-`src/plot_sweep.py`.
+(`baseline`, `year_explicit`, `era_prior`, `period_pure`) into
+`data/sweep/<variant>.csv` and plot the small-multiples with `src/plot_sweep.py`.
+
+Prompt scaffolding is opt-in, off by default — pass `-T give_hint=true` to add a
+demographic-pattern hint, or `-T ask_decimal=false` for a fully bare prompt.
 
 Qwen3 is a reasoning model; `inspect_task.py` disables thinking by default
 (`disable_thinking=True`, which appends `/no_think`) so the answer isn't buried

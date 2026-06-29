@@ -76,12 +76,18 @@ _NO_THINK = "/no_think"
 
 @task
 def bpw(grid_path: str = "data/grid.csv",
-        prompt: str = "era_prior",
+        prompt: str = "baseline",
         temperature: float = 1e-7,   # near-greedy; hf/transformers rejects 0.0
         max_tokens: int = 128,
-        disable_thinking: bool = True) -> Task:
-    """Births-per-woman probe over a profile grid, using one prompt variant."""
-    system = system_prompt(prompt)
+        disable_thinking: bool = True,
+        give_hint: bool = False,
+        ask_decimal: bool = True) -> Task:
+    """Births-per-woman probe over a profile grid, using one prompt variant.
+
+    give_hint / ask_decimal are opt-in prompt scaffolding (see probe.py); both
+    default to the simple setting so a capable model gets a bare question.
+    """
+    system = system_prompt(prompt, give_hint=give_hint, ask_decimal=ask_decimal)
     if disable_thinking:
         system = f"{system}\n{_NO_THINK}"
     return Task(
