@@ -1,9 +1,9 @@
-"""Generate the input grid of "fake people" for the llm-bpw probe.
+"""Generate the input grid of synthetic profiles for the llm-bpw probe.
 
-Each row is one synthetic person description that we will later hand to an LLM,
-asking it to estimate that person's births-per-woman (age-specific fertility
-rate) in the coming year. This script does *no* model calls — it only produces
-the clean input CSV.
+Each row is one synthetic profile that we will later hand to an LLM, asking it to
+estimate that profile's births-per-woman (age-specific fertility rate) in the
+coming year. This script does *no* model calls — it only produces the clean
+input CSV.
 
 The grid is the full cartesian product of:
 

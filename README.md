@@ -1,34 +1,32 @@
 # llm-bpw
 
-**B**irths **p**er **w**oman: probing LLMs, zero-shot, for what they believe about
-human fertility.
+**B**irths **p**er **w**oman: probing what language models believe about human
+fertility, zero-shot.
 
-Given a short description of a "fake person" — birth cohort, age, sex, country — we
-ask a language model to estimate that person's **age-specific fertility rate**: the
-expected number of births per person in the coming year (births per woman, at that
-age). Demographers plot these age-profiles ("fertility schedules"); the goal here is
-to see what models believe across cohorts and countries, with no training or
-fine-tuning.
+Given a synthetic profile — birth cohort, age, sex, country — we ask a model to
+estimate that profile's **age-specific fertility rate**: the expected number of
+births per woman at that age in the coming year. Demographers call these
+age-profiles "fertility schedules." The aim is to map what models believe across
+cohorts and countries, with no training or fine-tuning.
 
-This is a *rate*, not a yes/no probability — it can exceed what a single-birth
-probability would allow (twins, or births in January and December) — so model
-outputs will be recorded as a rate, not a probability.
+This is a *rate*, not a yes/no probability — it can exceed 1 (twins, or births in
+January and December) — so outputs are recorded as rates.
 
 ## Status
 
-Early prototype. Right now the repo builds **stage 1** of the pipeline:
+Early prototype. The repo currently implements **stage 1** of the pipeline:
 
 ```
 [1] generate grid → [2] build prompts → [3] query model → [4] parse & join → [5] plot
     grid.csv  ✅       (next)             Ollama (Qwen)      results.csv         later
 ```
 
-Stages 2–5 (prompting, querying a local Qwen via Ollama, parsing, plotting) are
-future work.
+Stages 2–5 — prompting, querying a local Qwen via Ollama, parsing, and plotting —
+are future work.
 
 ## Input fields
 
-The grid CSV contains exactly these four columns — the fields handed to the model:
+The grid CSV holds exactly these four columns, the fields handed to the model:
 
 | column | meaning | values |
 |---|---|---|
@@ -47,7 +45,7 @@ Requires `pandas` (see `requirements.txt`).
 # Defaults → data/grid.csv (6 cohorts × 56 ages × 2 sexes × 1 country = 672 rows)
 python src/generate_grid.py
 
-# Override anything from the command line
+# Override any field from the command line
 python src/generate_grid.py \
     --birth-years 1980 1990 2000 \
     --countries Denmark Japan \
@@ -55,4 +53,4 @@ python src/generate_grid.py \
     --out data/my_grid.csv
 ```
 
-Output is deterministic — re-running with the same arguments yields the same file.
+Output is deterministic: the same arguments always produce the same file.
