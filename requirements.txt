@@ -1,1 +1,11 @@
+# Grid generation + plotting
 pandas
+matplotlib
+
+# Model probing: Inspect AI driving models through the hf/ provider
+# (transformers + torch). Same stack on the laptop (small Qwen) and della
+# (large Qwen), so runs stay comparable.
+inspect-ai
+torch
+transformers
+accelerate

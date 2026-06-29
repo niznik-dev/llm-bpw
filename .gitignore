@@ -1,6 +1,9 @@
 # Generated data (regenerate with src/generate_grid.py)
 data/
 
+# Inspect AI run logs (.eval), regenerated each run
+logs/
+
 # Python
 __pycache__/
 *.py[cod]
