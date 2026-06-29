@@ -67,6 +67,14 @@ The large-model run on della uses the same task via SLURM — see
 (`baseline`, `year_explicit`, `era_prior`, `period_pure`) into
 `data/sweep/<variant>.csv` and plot the small-multiples with `src/plot_sweep.py`.
 
+To probe a hosted model via **Together.ai** (no local GPU), the same task runs
+through Inspect's `together/` provider:
+
+```bash
+cp .env.example .env          # add your TOGETHER_API_KEY (.env is gitignored)
+bash inspect/run_together.sh  # override with MODEL=… PROMPT=… as needed
+```
+
 Prompt scaffolding is opt-in, off by default — pass `-T give_hint=true` to add a
 demographic-pattern hint, or `-T ask_decimal=false` for a fully bare prompt.
 
