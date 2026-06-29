@@ -23,16 +23,31 @@ import random
 import subprocess
 from pathlib import Path
 
-# adjective_verb run names — easy to say, hard to confuse at a glance.
-_ADJECTIVES = ["brave", "curious", "gentle", "quiet", "eager", "clever", "calm",
-               "bold", "wry", "keen", "merry", "lucid", "stoic", "nimble",
-               "cosmic", "amber", "velvet", "patient"]
-_VERBS = ["probes", "counts", "asks", "charts", "maps", "tallies", "queries",
-          "samples", "gauges", "weighs", "reckons", "surveys"]
+# Run folders are <datestamp>/<model>_<noun> — the model says what, the random
+# noun keeps same-model same-day runs apart.
+_NOUNS = ["otter", "falcon", "cedar", "comet", "harbor", "lantern", "willow",
+          "quartz", "raven", "meadow", "ember", "delta", "sparrow", "cobalt",
+          "marlin", "juniper", "wren", "basalt", "pylon", "tundra"]
 
 
-def make_run_name(now):
-    return f"{random.choice(_ADJECTIVES)}_{random.choice(_VERBS)}_{now:%Y%m%d_%H%M%S}"
+def short_model(model):
+    """together/google/gemma-4-31B-it -> gemma-4-31B-it (filesystem-safe leaf)."""
+    return model.split("/")[-1] if model else "model"
+
+
+def make_run_name(model):
+    return f"{short_model(model)}_{random.choice(_NOUNS)}"
+
+# 4-profile sentinel: cheap de-risking before a full grid. (year, age, sex,
+# country) — period framing. Spans the stress cases: historical-high,
+# modern-peak, young-edge, and a future-year/older-age combo that exposes
+# streaming, reasoning, and parsing problems.
+SENTINEL_ROWS = [
+    (1920, 28, "Female", "Denmark"),
+    (1990, 28, "Female", "Denmark"),
+    (1990, 16, "Female", "Denmark"),
+    (2024, 45, "Female", "Denmark"),
+]
 
 
 def build_metadata(args, name, now, grid, log_dir, eval_log):
@@ -86,7 +101,12 @@ def main():
     p.add_argument("--prompt", default="baseline", help="Prompt variant (default: %(default)s).")
     p.add_argument("--grid", default="data/grid.csv", help="Grid CSV (default: %(default)s).")
     p.add_argument("--limit", type=int, help="Cap number of samples (e.g. 1 for a test).")
+    p.add_argument("--sentinel", action="store_true",
+                   help="Run the built-in 4-profile sentinel instead of --grid "
+                        "(de-risk a new model before the full run).")
     p.add_argument("--device", help="hf/ device, e.g. mps or auto (omit for hosted APIs).")
+    p.add_argument("--stream", action="store_true",
+                   help="Force streaming (some Together models, e.g. *-Plus, require it).")
     p.add_argument("--allow-thinking", action="store_true",
                    help="Don't append /no_think (use for non-Qwen reasoning "
                         "models like Gemma; pair with a larger --max-tokens).")
@@ -99,11 +119,26 @@ def main():
     args = p.parse_args()
 
     now = datetime.datetime.now()
-    name = args.run_name or make_run_name(now)
-    run_dir = Path(args.runs_dir) / name
+    # Default layout: runs/<datestamp>/<model>_<noun>/. --run-name overrides the
+    # whole subpath (used to drop sentinels under runs/sentinel/<model>).
+    if args.run_name:
+        name = args.run_name
+        run_dir = Path(args.runs_dir) / name
+    else:
+        name = make_run_name(args.model)
+        run_dir = Path(args.runs_dir) / now.strftime("%Y%m%d") / name
     log_dir = run_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    grid = Path(args.grid).resolve()
+
+    if args.sentinel:
+        import csv as _csv
+        grid = (run_dir / "sentinel_grid.csv").resolve()
+        with open(grid, "w", newline="") as fh:
+            w = _csv.writer(fh)
+            w.writerow(["year", "age", "sex", "country"])
+            w.writerows(SENTINEL_ROWS)
+    else:
+        grid = Path(args.grid).resolve()
 
     cmd = ["inspect", "eval", "src/inspect_task.py@bpw", "--model", args.model,
            "-T", f"grid_path={grid}", "-T", f"prompt={args.prompt}",
@@ -112,6 +147,8 @@ def main():
         cmd += ["--limit", str(args.limit)]
     if args.device:
         cmd += ["-M", f"device={args.device}"]
+    if args.stream:
+        cmd += ["-M", "stream=true"]
     if args.allow_thinking:
         cmd += ["-T", "disable_thinking=false"]
     if args.give_hint:
@@ -136,6 +173,20 @@ def main():
 
     print(f"\nBundled run -> {run_dir}/")
     print("  results.csv  metadata.json  logs/")
+
+    # Central null log — appended to so nulls can be reviewed/backfilled later.
+    import pandas as pd
+    nulls = pd.read_csv(results)
+    nulls = nulls[nulls["births_per_woman"].isna()]
+    if len(nulls):
+        log = Path(args.runs_dir) / "nulls_log.tsv"
+        header = not log.exists()
+        with open(log, "a") as fh:
+            if header:
+                fh.write("timestamp\trun\tmodel\tyear\tage\n")
+            for r in nulls.itertuples():
+                fh.write(f"{now:%Y%m%d_%H%M%S}\t{name}\t{args.model}\t{r.year}\t{r.age}\n")
+        print(f"  logged {len(nulls)} null(s) to {log}")
 
 
 if __name__ == "__main__":

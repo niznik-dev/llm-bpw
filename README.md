@@ -3,11 +3,12 @@
 **B**irths **p**er **w**oman: probing what language models believe about human
 fertility, zero-shot.
 
-Given a synthetic profile — birth cohort, age, sex, country — we ask a model to
+Given a synthetic profile — calendar year, age, sex, country — we ask a model to
 estimate that profile's **age-specific fertility rate**: the expected number of
-births per woman at that age in the coming year. Demographers call these
-age-profiles "fertility schedules." The aim is to map what models believe across
-cohorts and countries, with no training or fine-tuning.
+births per woman at that age during that year. Demographers call these
+age-profiles "fertility schedules." This is **period** fertility — fix the year,
+sweep age — not a birth cohort followed through time. The aim is to map what
+models believe across years and countries, with no training or fine-tuning.
 
 This is a *rate*, not a yes/no probability — it can exceed 1 (twins, or births in
 January and December) — so outputs are recorded as rates.
@@ -32,7 +33,7 @@ The grid CSV holds exactly these four columns, the fields handed to the model:
 
 | column | meaning | values |
 |---|---|---|
-| `year_of_birth` | birth cohort | user-supplied (default: decadal 1950–2000) |
+| `year` | calendar (period) year | user-supplied (default: decadal 1950–2000) |
 | `age` | age in years | 10–55 inclusive (configurable) |
 | `sex` | sex at birth | Male, Female |
 | `country` | country | Denmark (expandable) |
@@ -46,7 +47,7 @@ grid/plots, and Inspect AI + transformers/torch for the model probe.
 
 ```bash
 # [1] Build the input grid (deterministic). Female-only by default.
-python src/generate_grid.py --birth-years 1920 1960 1990 2024
+python src/generate_grid.py --years 1920 1960 1990 2024
 
 # [2] Probe a model. Laptop dev on a small Qwen (auto-downloads from HF hub).
 #     The prompt is bare by default; ask the model for a decimal rate directly.
@@ -58,7 +59,7 @@ inspect eval src/inspect_task.py@bpw \
 # [3] Turn the newest .eval log into a plot-ready results.csv
 python src/inspect_to_csv.py --latest --out data/results.csv
 
-# [4] Plot the fertility schedules (one curve per cohort)
+# [4] Plot the fertility schedules (one curve per year)
 python src/plot_results.py
 ```
 
