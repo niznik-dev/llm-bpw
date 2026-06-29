@@ -28,7 +28,9 @@ COLUMNS = ["year_of_birth", "age", "sex", "country"]
 # Defaults, all overridable from the command line.
 DEFAULT_BIRTH_YEARS = [1950, 1960, 1970, 1980, 1990, 2000]
 DEFAULT_COUNTRIES = ["Denmark"]
-DEFAULT_SEXES = ["Male", "Female"]
+# Female-only by default: the probe targets births-per-woman, and male
+# profiles return ~0 (a grounding check, not signal). Re-add with --sexes Male.
+DEFAULT_SEXES = ["Female"]
 DEFAULT_MIN_AGE = 0
 DEFAULT_MAX_AGE = 55
 DEFAULT_OUT = Path("data/grid.csv")

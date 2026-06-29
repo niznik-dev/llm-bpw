@@ -14,15 +14,17 @@ January and December) — so outputs are recorded as rates.
 
 ## Status
 
-Early prototype. The repo currently implements **stage 1** of the pipeline:
+End-to-end pipeline working:
 
 ```
-[1] generate grid → [2] build prompts → [3] query model → [4] parse & join → [5] plot
-    grid.csv  ✅       (next)             Ollama (Qwen)      results.csv         later
+[1] generate grid → [2] prompt + query → [3] parse → [4] plot
+    grid.csv  ✅       Inspect AI, hf/ ✅   results.csv ✅   *.png ✅
 ```
 
-Stages 2–5 — prompting, querying a local Qwen via Ollama, parsing, and plotting —
-are future work.
+Models run through **Inspect AI's `hf/` provider** — a small Qwen on the laptop
+(dev/smoke-test) and a large Qwen on della — so only the model changes between
+runs. The prompt variants and answer parser live in `src/probe.py` so those
+runs stay comparable.
 
 ## Input fields
 
@@ -39,18 +41,32 @@ The grid is the full cartesian product of these fields.
 
 ## Usage
 
-Requires `pandas` (see `requirements.txt`).
+Install deps (`pip install -r requirements.txt`): pandas + matplotlib for the
+grid/plots, and Inspect AI + transformers/torch for the model probe.
 
 ```bash
-# Defaults → data/grid.csv (6 cohorts × 56 ages × 2 sexes × 1 country = 672 rows)
-python src/generate_grid.py
+# [1] Build the input grid (deterministic). Female-only by default.
+python src/generate_grid.py --birth-years 1920 1960 1990 2024
 
-# Override any field from the command line
-python src/generate_grid.py \
-    --birth-years 1980 1990 2000 \
-    --countries Denmark Japan \
-    --max-age 50 \
-    --out data/my_grid.csv
+# [2] Probe a model. Laptop dev on a small Qwen (auto-downloads from HF hub);
+#     era_prior is the prompt variant that best surfaces cohort differences.
+inspect eval src/inspect_task.py@bpw \
+    --model hf/Qwen/Qwen3-4B \
+    -T grid_path=$PWD/data/grid.csv -T prompt=era_prior \
+    -M device=mps --log-dir logs
+
+# [3] Turn the newest .eval log into a plot-ready results.csv
+python src/inspect_to_csv.py --latest --out data/results.csv
+
+# [4] Plot the fertility schedules (one curve per cohort)
+python src/plot_results.py
 ```
 
-Output is deterministic: the same arguments always produce the same file.
+The large-model run on della uses the same task via SLURM — see
+`inspect/run_della.slurm`. To compare prompt framings, run step [2] per variant
+into `data/sweep/<variant>.csv` and plot the small-multiples with
+`src/plot_sweep.py`.
+
+Qwen3 is a reasoning model; `inspect_task.py` disables thinking by default
+(`disable_thinking=True`, which appends `/no_think`) so the answer isn't buried
+in the reasoning channel.
