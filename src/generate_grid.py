@@ -31,7 +31,7 @@ DEFAULT_COUNTRIES = ["Denmark"]
 # Female-only by default: the probe targets births-per-woman, and male
 # profiles return ~0 (a grounding check, not signal). Re-add with --sexes Male.
 DEFAULT_SEXES = ["Female"]
-DEFAULT_MIN_AGE = 0
+DEFAULT_MIN_AGE = 10  # fertility is ~zero below this; skip it to save tokens
 DEFAULT_MAX_AGE = 55
 DEFAULT_OUT = Path("data/grid.csv")
 

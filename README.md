@@ -33,7 +33,7 @@ The grid CSV holds exactly these four columns, the fields handed to the model:
 | column | meaning | values |
 |---|---|---|
 | `year_of_birth` | birth cohort | user-supplied (default: decadal 1950–2000) |
-| `age` | age in years | 0–55 inclusive (configurable) |
+| `age` | age in years | 10–55 inclusive (configurable) |
 | `sex` | sex at birth | Male, Female |
 | `country` | country | Denmark (expandable) |
 
