@@ -18,8 +18,8 @@ January and December) — so outputs are recorded as rates.
 End-to-end pipeline working:
 
 ```
-[1] generate grid → [2] prompt + query → [3] parse → [4] plot
-    grid.csv  ✅       Inspect AI, hf/ ✅   results.csv ✅   *.png ✅
+[1] generate grid → [2] prompt + query → [3] parse → [4] plot → [5] compare vs HFD
+    grid.csv  ✅       Inspect AI ✅        results.csv ✅   *.png ✅   leaderboard ✅
 ```
 
 Models run through **Inspect AI's `hf/` provider** — a small Qwen on the laptop
@@ -82,3 +82,43 @@ demographic-pattern hint, or `-T ask_decimal=false` for a fully bare prompt.
 Qwen3 is a reasoning model; `inspect_task.py` disables thinking by default
 (`disable_thinking=True`, which appends `/no_think`) so the answer isn't buried
 in the reasoning channel.
+
+`src/run_probe.py` wraps a run so its outputs land together in
+`data/runs/<date>/<model>/` (results.csv + metadata.json + logs), which the
+comparison tools below expect.
+
+## Compare against real fertility (HFD)
+
+The probe elicits *beliefs*; to score them, compare against real
+[Human Fertility Database](https://www.humanfertility.org/) period ASFR — free to
+use **with attribution** (cite HFD / MPIDR + VID; the raw files stay out of git).
+Download a country's "year, age" ASFR file (e.g. `DNKasfrRR.txt`) into `data/`:
+
+```bash
+# Build the observed baseline (the anchor year is the first --years value)
+python scripts/load_hfd.py                                   # -> data/hfd_denmark_asfr.csv
+python scripts/load_hfd.py --src data/USAasfrRR.txt --country "United States" \
+    --years 1933 1960 1990 2024 --out data/hfd_usa_asfr.csv  # US anchors on 1933 (1920 absent)
+
+# Overlay the baseline (dashed), or plot model - observed residuals
+python src/plot_compare.py --runs-dir data/runs/<date> --smooth 3          # schedules + baseline
+python src/plot_compare.py --runs-dir data/runs/<date> --diff --smooth 3   # residual postage stamps
+
+# Score: per-year RMSE + a per-country feature scorecard -> leaderboard.csv/.png
+python scripts/score_models.py --runs-dir data/runs/<date> --real data/hfd_usa_asfr.csv \
+    --years 1933 1960 1990 2024
+python src/plot_leaderboard.py --csv data/runs/<date>/leaderboard.csv --country "United States"
+```
+
+The **feature scorecard is country-specific** (`src/features.py`): each country's
+distinctive, well-posed signatures differ, so Denmark tests the subtle 1960≈1920
+boom reversal while the US — whose boom dwarfs its anchor — tests boom magnitude
+within a tolerance. Countries whose peak overflows the fixed axis take `--ymax`.
+
+Recover any null (unparsed) rows by re-querying at a larger token budget, with
+logs preserved and recovered rows tagged `backfilled`:
+
+```bash
+python scripts/retry_nulls.py data/runs/<date>            # 2x the run's tokens
+python scripts/retry_nulls.py data/runs/<date> --factor 4 # chase stubborn reasoners
+```
