@@ -104,16 +104,13 @@ python scripts/load_hfd.py --src data/USAasfrRR.txt --country "United States" \
 python src/plot_compare.py --runs-dir data/runs/<date> --smooth 3          # schedules + baseline
 python src/plot_compare.py --runs-dir data/runs/<date> --diff --smooth 3   # residual postage stamps
 
-# Score: per-year RMSE + a per-country feature scorecard -> leaderboard.csv/.png
+# Score: per-year RMSE vs the baseline -> leaderboard.csv
 python scripts/score_models.py --runs-dir data/runs/<date> --real data/hfd_usa_asfr.csv \
     --years 1933 1960 1990 2024
-python src/plot_leaderboard.py --csv data/runs/<date>/leaderboard.csv --country "United States"
 ```
 
-The **feature scorecard is country-specific** (`src/features.py`): each country's
-distinctive, well-posed signatures differ, so Denmark tests the subtle 1960≈1920
-boom reversal while the US — whose boom dwarfs its anchor — tests boom magnitude
-within a tolerance. Countries whose peak overflows the fixed axis take `--ymax`.
+Countries whose peak overflows the fixed plot axis take `--ymax` (e.g. the US 1960
+boom at ~0.27).
 
 Recover any null (unparsed) rows by re-querying at a larger token budget, with
 logs preserved and recovered rows tagged `backfilled`:

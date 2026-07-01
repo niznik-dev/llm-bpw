@@ -5,7 +5,7 @@
 #
 #   bash scripts/run_us_series.sh
 #
-# Flags per model mirror the Denmark series (see MODEL_QUEUE.md): streaming-only
+# Flags per model mirror the Denmark series: streaming-only
 # tiers get --stream; heavy reasoners get a big token budget + --allow-thinking.
 set -u
 GRID="data/grid_usa.csv"
