@@ -10,6 +10,9 @@ __pycache__/
 *.egg-info/
 .ipynb_checkpoints/
 
+# Secrets — never commit (use .env.example as the template)
+.env
+
 # Env / OS
 .venv/
 venv/

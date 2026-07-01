@@ -16,7 +16,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from plot_results import draw_cohorts
+from plot_results import draw_year_lines, smoothing_note
 
 # Preferred panel order: a cohort-salience gradient (least -> most explicit).
 PROMPT_ORDER = ["baseline", "year_explicit", "era_prior", "period_pure"]
@@ -54,17 +54,21 @@ def main():
     axes = axes.flatten()
 
     for ax, name in zip(axes, names):
-        draw_cohorts(ax, frames[name][frames[name]["sex"] == args.sex], smooth=args.smooth)
+        draw_year_lines(ax, frames[name][frames[name]["sex"] == args.sex], smooth=args.smooth)
         ax.set_title(name)
         ax.grid(True, alpha=0.3)
     for ax in axes[len(names):]:  # hide any empty panels
         ax.set_visible(False)
 
     handles, labels = axes[0].get_legend_handles_labels()
-    fig.legend(handles, labels, title="Birth cohort", loc="upper right")
+    fig.legend(handles, labels, title="Year", loc="upper right")
     fig.supxlabel("Age")
     fig.supylabel("Births per woman (next 12 months)")
-    fig.suptitle("Prompt sweep — does framing make Qwen differentiate cohorts?")
+    title = "Prompt sweep — does framing make Qwen differentiate cohorts?"
+    note = smoothing_note(args.smooth)
+    if note:
+        title += f"\n({note})"
+    fig.suptitle(title)
     fig.tight_layout()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)

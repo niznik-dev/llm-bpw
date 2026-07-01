@@ -1,6 +1,6 @@
 """Convert an Inspect .eval log into a plot-ready results.csv.
 
-Emits the canonical results.csv schema — year_of_birth, age, sex, country,
+Emits the canonical results.csv schema — year, age, sex, country,
 births_per_woman, raw_reply, prompt — so plot_results.py and plot_sweep.py
 consume Inspect output directly.
 
@@ -49,15 +49,11 @@ def main():
     for s in log.samples or []:
         md = s.metadata or {}
         completion = s.output.completion if s.output else ""
-        rows.append({
-            "year_of_birth": md.get("year_of_birth"),
-            "age": md.get("age"),
-            "sex": md.get("sex"),
-            "country": md.get("country"),
-            "births_per_woman": parse_birth_rate(completion),
-            "raw_reply": completion,
-            "prompt": md.get("prompt"),
-        })
+        row = {k: md.get(k) for k in PROFILE_FIELDS}
+        row["births_per_woman"] = parse_birth_rate(completion)
+        row["raw_reply"] = completion
+        row["prompt"] = md.get("prompt")
+        rows.append(row)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", newline="") as f:

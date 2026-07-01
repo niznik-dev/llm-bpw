@@ -33,42 +33,44 @@ def _noun(sex):
     return {"Female": "women", "Male": "men"}.get(sex, "people")
 
 
-# --- Prompt variants, ordered along a cohort-salience gradient ---------------
-# Each entry is a {system, user(profile)->str} pair. The variants vary ONLY how
-# visible the birth cohort / calendar year is — that's the experiment. They no
-# longer bake in a hint or an output format; those are opt-in (see system_prompt).
+# --- Prompt variants (phrasings of one period-fertility question) ------------
+# Each entry is a {system, user(profile)->str} pair. All ask for the
+# age-specific fertility rate in a given country, calendar YEAR, and age — this
+# is PERIOD fertility: fix the year, vary age (not a birth cohort followed
+# through time). The variants differ only in phrasing / priming; hints and
+# output format are opt-in (see system_prompt).
 
 PROMPTS = {
-    # Cohort given only as a separate "year of birth" field.
+    # Profile listed as fields.
     "baseline": {
         "system": (
             "You are a demographer estimating age-specific fertility rates. "
             "Estimate the age-specific fertility rate for the profile below — "
-            "the expected number of births per woman of this exact age in a "
-            "single year."
+            "the expected number of births per woman of this age, in this "
+            "country, during this calendar year."
         ),
         "user": lambda p: (
             "Profile:\n"
-            f"- Year of birth: {p['year_of_birth']}\n"
-            f"- Current age: {p['age']}\n"
+            f"- Year: {p['year']}\n"
+            f"- Age: {p['age']}\n"
             f"- Sex: {p['sex']}\n"
             f"- Country: {p['country']}\n"
             "Age-specific fertility rate (births per woman)?"
         ),
     },
-    # State the actual calendar year so the historical period is explicit.
+    # Phrased as a sentence.
     "year_explicit": {
         "system": (
             "You are a demographer estimating age-specific fertility rates for "
             "a specific country and calendar year."
         ),
         "user": lambda p: (
-            f"In {p['country']}, in the year {p['year_of_birth'] + p['age']}, "
-            f"what is the age-specific fertility rate (births per woman) for "
-            f"{_noun(p['sex'])} aged {p['age']} (born in {p['year_of_birth']})?"
+            f"In {p['country']}, in the year {p['year']}, what is the "
+            f"age-specific fertility rate (births per woman) for "
+            f"{_noun(p['sex'])} aged {p['age']}?"
         ),
     },
-    # As year_explicit, but prime that fertility has changed over time.
+    # As year_explicit, but prime that fertility changes over time.
     "era_prior": {
         "system": (
             "You are a demographer estimating age-specific fertility rates for "
@@ -77,12 +79,12 @@ PROMPTS = {
             "account."
         ),
         "user": lambda p: (
-            f"In {p['country']}, in the year {p['year_of_birth'] + p['age']}, "
-            f"what is the age-specific fertility rate (births per woman) for "
-            f"{_noun(p['sex'])} aged {p['age']} (born in {p['year_of_birth']})?"
+            f"In {p['country']}, in the year {p['year']}, what is the "
+            f"age-specific fertility rate (births per woman) for "
+            f"{_noun(p['sex'])} aged {p['age']}?"
         ),
     },
-    # Pure period question: no cohort framing, just country/year/age.
+    # Terse field list.
     "period_pure": {
         "system": (
             "You are a demographer reporting historical age-specific fertility "
@@ -90,7 +92,7 @@ PROMPTS = {
         ),
         "user": lambda p: (
             f"Country: {p['country']}\n"
-            f"Year: {p['year_of_birth'] + p['age']}\n"
+            f"Year: {p['year']}\n"
             f"Age: {p['age']}\n"
             "Age-specific fertility rate (births per woman):"
         ),
@@ -100,7 +102,8 @@ PROMPTS = {
 DEFAULT_PROMPT = "baseline"
 
 # Fields every profile row carries, and their types (for CSV coercion).
-PROFILE_FIELDS = {"year_of_birth": int, "age": int, "sex": str, "country": str}
+# `year` is the calendar (period) year — the line identity in a period schedule.
+PROFILE_FIELDS = {"year": int, "age": int, "sex": str, "country": str}
 
 
 def coerce_profile(row):
@@ -141,6 +144,11 @@ def parse_birth_rate(text):
     """
     if text is None:
         return None
+    # Reasoning models may inline a <think>...</think> block before the answer
+    # (and /no_think doesn't always suppress it). Parse only the final segment so
+    # we don't grab a number from the reasoning (e.g. a TFR mentioned mid-thought).
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[1]
     nums = _NUM_RE.findall(text)
     if not nums:
         return None
