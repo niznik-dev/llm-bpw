@@ -17,7 +17,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from plot_results import draw_year_lines, short_model, smoothing_note
+from plot_results import (add_limit_args, draw_year_lines, limits_from_args,
+                          short_model, smoothing_note)
+from reference import DEFAULT_REFERENCE, add_residual, resolve_baseline
 
 
 def load_runs(dirs, min_rows):
@@ -47,6 +49,13 @@ def parse_args():
     p.add_argument("--smooth", type=int, default=1, help="Rolling-mean window; 1 = raw (default: %(default)s).")
     p.add_argument("--min-rows", type=int, default=20,
                    help="Skip runs with fewer data rows (drops backfill/test stubs).")
+    p.add_argument("--real", type=Path, default=DEFAULT_REFERENCE,
+                   help="Observed baseline CSV to overlay dashed (default: %(default)s).")
+    p.add_argument("--no-real", action="store_true",
+                   help="Hide the observed baseline overlay.")
+    p.add_argument("--diff", action="store_true",
+                   help="Plot model − observed residuals in each panel.")
+    add_limit_args(p)
     return p.parse_args()
 
 
@@ -58,6 +67,8 @@ def main():
     runs = load_runs(dirs, args.min_rows)
     if not runs:
         raise SystemExit("No run folders with results.csv + metadata.json (>= min-rows) found.")
+    real = resolve_baseline(args.real, no_real=args.no_real, diff=args.diff)
+    rate_limits, resid_limits = limits_from_args(args.ymax, args.resid_max)
 
     n = len(runs)
     ncols = math.ceil(math.sqrt(n))
@@ -67,7 +78,14 @@ def main():
     axes = axes.flatten()
 
     for ax, run in zip(axes, runs):
-        draw_year_lines(ax, run["df"][run["df"]["sex"] == args.sex], smooth=args.smooth)
+        panel = run["df"][run["df"]["sex"] == args.sex]
+        value_col = "births_per_woman"
+        if args.diff:
+            panel = add_residual(panel, real)
+            value_col = "residual"
+        draw_year_lines(ax, panel, smooth=args.smooth,
+                        real=(None if args.diff else real), value_col=value_col,
+                        rate_limits=rate_limits, resid_limits=resid_limits)
         title = short_model(run["model"])
         if run["prompt"]:
             title += f"  ({run['prompt']})"
@@ -91,11 +109,20 @@ def main():
         fig.legend(handles, labels, title="Year",
                    loc="upper right", bbox_to_anchor=(1.0, 1.0))
     fig.supxlabel("Age")
-    fig.supylabel("Births per woman (next 12 months)")
-    title = "Model comparison — age-specific fertility schedules"
+    if args.diff:
+        fig.supylabel("Model − observed (births per woman)")
+        title = "Model residuals vs observed (HFD) — age-specific fertility"
+    else:
+        fig.supylabel("Births per woman (next 12 months)")
+        title = "Model comparison — age-specific fertility schedules"
+    subnotes = []
+    if real is not None and not args.diff:
+        subnotes.append("dashed = observed (HFD)")
     note = smoothing_note(args.smooth)
     if note:
-        title += f"\n({note})"
+        subnotes.append(note)
+    if subnotes:
+        title += "\n(" + " · ".join(subnotes) + ")"
     fig.suptitle(title)
     fig.tight_layout()
 
