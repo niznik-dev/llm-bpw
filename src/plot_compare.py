@@ -17,6 +17,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from model_meta import badge, best_rank
 from plot_results import (add_limit_args, draw_year_lines, limits_from_args,
                           short_model, smoothing_note)
 from reference import DEFAULT_REFERENCE, add_residual, resolve_baseline
@@ -69,6 +70,8 @@ def main():
         raise SystemExit("No run folders with results.csv + metadata.json (>= min-rows) found.")
     real = resolve_baseline(args.real, no_real=args.no_real, diff=args.diff)
     rate_limits, resid_limits = limits_from_args(args.ymax, args.resid_max)
+    # Order panels best-available first, then the weaker siblings.
+    runs.sort(key=lambda r: best_rank(short_model(r["model"])))
 
     n = len(runs)
     ncols = math.ceil(math.sqrt(n))
@@ -89,6 +92,7 @@ def main():
         title = short_model(run["model"])
         if run["prompt"]:
             title += f"  ({run['prompt']})"
+        title += f"\n{badge(short_model(run['model']))}"  # size tier · configured-thinking
         ax.set_title(title, fontsize=9)
         ax.grid(True, alpha=0.3)
     # Axes limits are fixed inside draw_year_lines (AGE_LIMITS / RATE_LIMITS),
@@ -121,6 +125,7 @@ def main():
     note = smoothing_note(args.smooth)
     if note:
         subnotes.append(note)
+    subnotes.append("badge: ★ best-avail / ○ alt · thinking ● on / ○ off / ◐ amb")
     if subnotes:
         title += "\n(" + " · ".join(subnotes) + ")"
     fig.suptitle(title)
