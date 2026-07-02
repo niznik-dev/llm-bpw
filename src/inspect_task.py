@@ -28,6 +28,7 @@ from inspect_ai.model import GenerateConfig
 from inspect_ai.scorer import Score, Target, mean, scorer
 from inspect_ai.solver import chain, generate, system_message
 
+from model_meta import thinking_extra_body
 from probe import coerce_profile, parse_birth_rate, system_prompt, user_prompt
 
 
@@ -80,15 +81,31 @@ def bpw(grid_path: str = "data/grids/grid.csv",
         temperature: float = 1e-7,   # near-greedy; hf/transformers rejects 0.0
         max_tokens: int = 512,        # room for reasoning models to think + answer
         disable_thinking: bool = True,
+        thinking: str = "",           # "off"|"on": explicit per-model extra_body control
+        model_key: str = "",          # short model name, for the registry lookup
         give_hint: bool = False,
         ask_decimal: bool = True) -> Task:
     """Births-per-woman probe over a profile grid, using one prompt variant.
 
+    Thinking control: pass thinking="off"/"on" + model_key to set the exact
+    per-model reasoning `extra_body` from the registry (Together — authoritative).
+    If the model isn't in the registry (e.g. an hf/ local model), fall back to the
+    /no_think soft switch. With neither, the legacy disable_thinking default holds.
+
     give_hint / ask_decimal are opt-in prompt scaffolding (see probe.py); both
     default to the simple setting so a capable model gets a bare question.
     """
+    # Inspect's -T parser reads `off`/`on` as YAML booleans, so a passed
+    # thinking=off arrives as False. Map it back to the string state.
+    if isinstance(thinking, bool):
+        thinking = "on" if thinking else "off"
     system = system_prompt(prompt, give_hint=give_hint, ask_decimal=ask_decimal)
-    if disable_thinking:
+    extra_body = None
+    if thinking:
+        extra_body = thinking_extra_body(model_key, thinking) or None
+        if extra_body is None and thinking == "off":
+            system = f"{system}\n{_NO_THINK}"   # registry miss -> soft-switch fallback
+    elif disable_thinking:
         system = f"{system}\n{_NO_THINK}"
     return Task(
         dataset=_load_samples(grid_path, prompt),
@@ -97,5 +114,6 @@ def bpw(grid_path: str = "data/grids/grid.csv",
             generate(),
         ),
         scorer=births_scorer(),
-        config=GenerateConfig(temperature=temperature, max_tokens=max_tokens),
+        config=GenerateConfig(temperature=temperature, max_tokens=max_tokens,
+                              extra_body=extra_body),
     )

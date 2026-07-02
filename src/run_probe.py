@@ -108,8 +108,12 @@ def main():
     p.add_argument("--stream", action="store_true",
                    help="Force streaming (some Together models, e.g. *-Plus, require it).")
     p.add_argument("--allow-thinking", action="store_true",
-                   help="Don't append /no_think (use for non-Qwen reasoning "
-                        "models like Gemma; pair with a larger --max-tokens).")
+                   help="Legacy /no_think toggle: don't append /no_think (hf/ "
+                        "local models). Superseded by --thinking for Together.")
+    p.add_argument("--thinking", choices=["off", "on"], default=None,
+                   help="Explicit per-model thinking control via extra_body "
+                        "(from model_meta.yaml — authoritative on Together). Omit "
+                        "to use the legacy /no_think default.")
     p.add_argument("--give-hint", action="store_true", help="Add the demographic-pattern hint.")
     p.add_argument("--no-decimal", action="store_true", help="Drop the decimal-output instruction.")
     p.add_argument("--temperature", type=float, help="Override sampling temperature.")
@@ -151,6 +155,9 @@ def main():
         cmd += ["-M", "stream=true"]
     if args.allow_thinking:
         cmd += ["-T", "disable_thinking=false"]
+    if args.thinking:
+        cmd += ["-T", f"thinking={args.thinking}",
+                "-T", f"model_key={short_model(args.model)}"]
     if args.give_hint:
         cmd += ["-T", "give_hint=true"]
     if args.no_decimal:
@@ -179,13 +186,17 @@ def main():
     nulls = pd.read_csv(results)
     nulls = nulls[nulls["births_per_woman"].isna()]
     if len(nulls):
+        # The line dimension is `year` (period) or `cohort` (cohort) — log whichever
+        # this grid used so cohort runs don't trip on a missing `year` column.
+        dim = "cohort" if "cohort" in nulls.columns else "year"
         log = Path(args.runs_dir) / "nulls_log.tsv"
         header = not log.exists()
         with open(log, "a") as fh:
             if header:
-                fh.write("timestamp\trun\tmodel\tyear\tage\n")
+                fh.write("timestamp\trun\tmodel\tkey\tage\n")
             for r in nulls.itertuples():
-                fh.write(f"{now:%Y%m%d_%H%M%S}\t{name}\t{args.model}\t{r.year}\t{r.age}\n")
+                fh.write(f"{now:%Y%m%d_%H%M%S}\t{name}\t{args.model}\t"
+                         f"{getattr(r, dim)}\t{r.age}\n")
         print(f"  logged {len(nulls)} null(s) to {log}")
 
 

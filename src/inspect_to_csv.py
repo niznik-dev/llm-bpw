@@ -14,9 +14,9 @@ from pathlib import Path
 
 from inspect_ai.log import read_eval_log
 
-from probe import PROFILE_FIELDS, parse_birth_rate
+from probe import PROFILE_FIELDS, parse_birth_rate, profile_schema
 
-COLUMNS = list(PROFILE_FIELDS) + ["births_per_woman", "raw_reply", "prompt"]
+TRAILING = ["births_per_woman", "raw_reply", "prompt"]
 
 
 def parse_args():
@@ -45,11 +45,17 @@ def main():
         raise SystemExit("Give a log path or pass --latest.")
 
     log = read_eval_log(str(log_path))
+    samples = log.samples or []
+    # Detect the line dimension (year vs cohort) from the first sample's metadata,
+    # so a cohort run emits a `cohort` column instead of `year`.
+    fields = list(profile_schema(samples[0].metadata) if samples else PROFILE_FIELDS)
+    columns = fields + TRAILING
+
     rows = []
-    for s in log.samples or []:
+    for s in samples:
         md = s.metadata or {}
         completion = s.output.completion if s.output else ""
-        row = {k: md.get(k) for k in PROFILE_FIELDS}
+        row = {k: md.get(k) for k in fields}
         row["births_per_woman"] = parse_birth_rate(completion)
         row["raw_reply"] = completion
         row["prompt"] = md.get("prompt")
@@ -57,7 +63,7 @@ def main():
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     with open(args.out, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=COLUMNS)
+        writer = csv.DictWriter(f, fieldnames=columns)
         writer.writeheader()
         writer.writerows(rows)
     print(f"Wrote {len(rows)} rows to {args.out} (from {log_path})")

@@ -53,3 +53,14 @@ def badge(model, registry=None):
     flag = "★ best" if m.get("is_best") else "○ alt"
     think = THINKING_GLYPH.get(m.get("thinking_configured", "ambiguous"), "◐ amb")
     return f"{flag} · {think}"
+
+
+def thinking_extra_body(model, state, registry=None):
+    """`extra_body` dict to force a model's reasoning `state` ('off'|'on').
+
+    Returns the per-model control from the registry (Qwen/Gemma/Nemotron use
+    chat_template_kwargs, GLM uses reasoning, MiniMax uses thinking) for Inspect's
+    GenerateConfig(extra_body=...). Returns {} when the model isn't configured
+    (e.g. an hf/ local model), so the caller can fall back to the /no_think path.
+    """
+    return meta_for(model, registry).get(f"thinking_{state}") or {}
