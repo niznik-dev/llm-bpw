@@ -5,7 +5,7 @@ age-specific fertility schedule vs the HFD baseline — overall and per calendar
 year — and writes a ranked leaderboard.csv.
 
     python scripts/score_models.py --runs-dir data/runs/20260701 \
-        --real data/hfd_usa_asfr.csv --years 1933 1960 1990 2024
+        --real data/baselines/hfd_usa_period_asfr.csv --years 1933 1960 1990 2024
 """
 
 import argparse

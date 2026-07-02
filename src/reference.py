@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_REFERENCE = Path("data/hfd_denmark_asfr.csv")
+DEFAULT_REFERENCE = Path("data/baselines/hfd_denmark_period_asfr.csv")
 
 # Real ASFR peaks below ~0.2; a model value above this is a parse leak (e.g. a
 # TFR that slipped out of the reasoning) and would otherwise blow up a residual.

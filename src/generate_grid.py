@@ -36,7 +36,7 @@ DEFAULT_COUNTRIES = ["Denmark"]
 DEFAULT_SEXES = ["Female"]
 DEFAULT_MIN_AGE = 10  # fertility is ~zero below this; skip it to save tokens
 DEFAULT_MAX_AGE = 55
-DEFAULT_OUT = Path("data/grid.csv")
+DEFAULT_OUT = Path("data/grids/grid.csv")
 
 
 def build_grid(years, ages, sexes, countries):

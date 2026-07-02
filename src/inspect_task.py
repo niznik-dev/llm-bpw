@@ -8,14 +8,14 @@ Local dev/smoke-test on a small Qwen (auto-downloads from the HF hub):
 
     inspect eval src/inspect_task.py@bpw \
         --model hf/Qwen/Qwen3-4B \
-        -T grid_path=$PWD/data/sweep_grid.csv -T prompt=era_prior --limit 8
+        -T grid_path=$PWD/data/grids/sweep_grid.csv -T prompt=era_prior --limit 8
 
 On della (large local Qwen) — see inspect/run_della.slurm:
 
     inspect eval src/inspect_task.py@bpw \
         --model hf/Qwen3-14B \
         -M model_path=/scratch/gpfs/MSALGANIK/pretrained-llms/Qwen3-14B \
-        -T grid_path=$PWD/data/grid.csv -T prompt=era_prior
+        -T grid_path=$PWD/data/grids/grid.csv -T prompt=era_prior
 
 Then turn the .eval log into a plot-ready results.csv with inspect_to_csv.py.
 """
@@ -75,7 +75,7 @@ _NO_THINK = "/no_think"
 
 
 @task
-def bpw(grid_path: str = "data/grid.csv",
+def bpw(grid_path: str = "data/grids/grid.csv",
         prompt: str = "baseline",
         temperature: float = 1e-7,   # near-greedy; hf/transformers rejects 0.0
         max_tokens: int = 512,        # room for reasoning models to think + answer

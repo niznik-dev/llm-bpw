@@ -53,7 +53,7 @@ python src/generate_grid.py --years 1920 1960 1990 2024
 #     The prompt is bare by default; ask the model for a decimal rate directly.
 inspect eval src/inspect_task.py@bpw \
     --model hf/Qwen/Qwen3-4B \
-    -T grid_path=$PWD/data/grid.csv -T prompt=baseline \
+    -T grid_path=$PWD/data/grids/grid.csv -T prompt=baseline \
     -M device=mps --log-dir logs
 
 # [3] Turn the newest .eval log into a plot-ready results.csv
@@ -92,21 +92,22 @@ comparison tools below expect.
 The probe elicits *beliefs*; to score them, compare against real
 [Human Fertility Database](https://www.humanfertility.org/) period ASFR — free to
 use **with attribution** (cite HFD / MPIDR + VID; the raw files stay out of git).
-Download a country's "year, age" ASFR file (e.g. `DNKasfrRR.txt`) into `data/`:
+Download a country's period "year, age" ASFR file (e.g. `DNKasfrRR.txt`) into
+`data/hfd_raw/`:
 
 ```bash
 # Build the observed baseline (the anchor year is the first --years value)
-python scripts/load_hfd.py                                   # -> data/hfd_denmark_asfr.csv
-python scripts/load_hfd.py --src data/USAasfrRR.txt --country "United States" \
-    --years 1933 1960 1990 2024 --out data/hfd_usa_asfr.csv  # US anchors on 1933 (1920 absent)
+python scripts/load_hfd.py                          # -> data/baselines/hfd_denmark_period_asfr.csv
+python scripts/load_hfd.py --src data/hfd_raw/USAasfrRR.txt --country "United States" \
+    --years 1933 1960 1990 2024 --out data/baselines/hfd_usa_period_asfr.csv  # US anchors 1933
 
 # Overlay the baseline (dashed), or plot model - observed residuals
 python src/plot_compare.py --runs-dir data/runs/<date> --smooth 3          # schedules + baseline
 python src/plot_compare.py --runs-dir data/runs/<date> --diff --smooth 3   # residual postage stamps
 
 # Score: per-year RMSE vs the baseline -> leaderboard.csv
-python scripts/score_models.py --runs-dir data/runs/<date> --real data/hfd_usa_asfr.csv \
-    --years 1933 1960 1990 2024
+python scripts/score_models.py --runs-dir data/runs/<date> \
+    --real data/baselines/hfd_usa_period_asfr.csv --years 1933 1960 1990 2024
 ```
 
 Countries whose peak overflows the fixed plot axis take `--ymax` (e.g. the US 1960
@@ -119,3 +120,18 @@ logs preserved and recovered rows tagged `backfilled`:
 python scripts/retry_nulls.py data/runs/<date>            # 2x the run's tokens
 python scripts/retry_nulls.py data/runs/<date> --factor 4 # chase stubborn reasoners
 ```
+
+## Data layout
+
+`data/` is gitignored (HFD files stay out of git — attribution required, no
+redistribution). It is organized as:
+
+| Dir | Holds |
+|---|---|
+| `data/hfd_raw/` | raw HFD downloads (`DNKasfrRR.txt` = period, `DNKasfrVH.txt` = cohort, …) |
+| `data/baselines/` | processed reference CSVs (`hfd_<country>_{period,cohort}_asfr.csv`) |
+| `data/grids/` | probe grids (`grid.csv`, `grid_usa.csv`, …) |
+| `data/runs/<date>/<model>/` | run outputs — `results.csv` + `metadata.json` + logs + plots |
+
+The model-metadata registry (`model_meta.yaml`) lives at the repo root, not in
+`data/`, since it's hand-authored config that needs to be tracked.

@@ -9,10 +9,10 @@ approximation read off the reference figure). HFD data is free to use with attri
 (Human Fertility Database, Max Planck Institute for Demographic Research and
 Vienna Institute of Demography) — cite it wherever these curves appear.
 
-    python scripts/load_hfd.py                      # -> data/hfd_denmark_asfr.csv
+    python scripts/load_hfd.py               # -> data/baselines/hfd_denmark_period_asfr.csv
     python scripts/load_hfd.py --years 1920 1960 1990 2024
-    python scripts/load_hfd.py --src data/USAasfrRR.txt --country "United States" \
-        --years 1933 1960 1990 2024 --out data/hfd_usa_asfr.csv
+    python scripts/load_hfd.py --src data/hfd_raw/USAasfrRR.txt --country "United States" \
+        --years 1933 1960 1990 2024 --out data/baselines/hfd_usa_period_asfr.csv
 
 The anchor (earliest) year is whatever you pass first in --years; pick each
 country's earliest solid pre-boom year (Denmark 1920, USA 1933 = Depression low).
@@ -35,14 +35,15 @@ def parse_age(token):
 def main():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--src", type=Path, default=Path("data/DNKasfrRR.txt"),
+    p.add_argument("--src", type=Path, default=Path("data/hfd_raw/DNKasfrRR.txt"),
                    help="HFD Denmark period ASFR file (default: %(default)s).")
     p.add_argument("--years", type=int, nargs="+", default=DEFAULT_YEARS,
                    help="Calendar years to keep; the earliest is the anchor "
                         "(default: %(default)s).")
     p.add_argument("--country", default="Denmark",
                    help="Country label written to the CSV (default: %(default)s).")
-    p.add_argument("--out", type=Path, default=Path("data/hfd_denmark_asfr.csv"),
+    p.add_argument("--out", type=Path,
+                   default=Path("data/baselines/hfd_denmark_period_asfr.csv"),
                    help="Output CSV (default: %(default)s).")
     args = p.parse_args()
 

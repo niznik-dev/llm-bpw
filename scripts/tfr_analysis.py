@@ -14,7 +14,7 @@ boom-flattening conserves mass (redistributes it) or destroys it (undershoots th
 total), and where displaced mass goes — younger, older, or both.
 
     python scripts/tfr_analysis.py --runs-dir data/runs/20260701 \
-        --real data/hfd_usa_asfr.csv --years 1933 1960 1990 2024
+        --real data/baselines/hfd_usa_period_asfr.csv --years 1933 1960 1990 2024
 """
 
 import argparse

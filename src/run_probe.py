@@ -11,7 +11,7 @@ Backend-agnostic — laptop hf/, della hf/, or Together — because it just sets
 --model string Inspect is given.
 
     # one-sample accuracy check on a hosted model
-    python src/run_probe.py --model together/<id> --grid data/test_one.csv --limit 1
+    python src/run_probe.py --model together/<id> --grid data/grids/test_one.csv --limit 1
     # full local dev run
     python src/run_probe.py --model hf/Qwen/Qwen3-4B --device mps
 """
@@ -99,7 +99,7 @@ def main():
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--model", required=True, help="Inspect model string, e.g. together/<id>.")
     p.add_argument("--prompt", default="baseline", help="Prompt variant (default: %(default)s).")
-    p.add_argument("--grid", default="data/grid.csv", help="Grid CSV (default: %(default)s).")
+    p.add_argument("--grid", default="data/grids/grid.csv", help="Grid CSV (default: %(default)s).")
     p.add_argument("--limit", type=int, help="Cap number of samples (e.g. 1 for a test).")
     p.add_argument("--sentinel", action="store_true",
                    help="Run the built-in 4-profile sentinel instead of --grid "
