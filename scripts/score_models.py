@@ -18,7 +18,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from reference import (DEFAULT_REFERENCE, MAX_PLAUSIBLE, add_residual,  # noqa: E402
-                       load_reference)
+                       line_dim, load_reference)
 
 DEFAULT_YEARS = [1920, 1960, 1990, 2024]  # Denmark grid; override with --years
 
@@ -31,8 +31,8 @@ def load_runs(runs_dir, sex):
         if not res.exists():
             continue
         df = pd.read_csv(res)
-        if "year" not in df.columns or len(df) < 20:  # skip stubs / old framing
-            continue
+        if not any(c in df.columns for c in ("year", "cohort")) or len(df) < 20:
+            continue  # skip stubs / old framing (need a year or cohort dimension)
         df = df[df["sex"] == sex].copy()
         df["model"] = json.loads(meta.read_text()).get("model", "?").split("/")[-1]
         frames.append(df)
@@ -61,10 +61,11 @@ def main():
     big = load_runs(args.runs_dir, args.sex)
     big = big[big["births_per_woman"] <= MAX_PLAUSIBLE]  # drop parse leaks
 
+    dim = line_dim(big)  # 'year' (period) or 'cohort' — per-key RMSE columns follow
     rows = []
     for model, mdf in big.groupby("model"):
         res = add_residual(mdf, ref)
-        rmse = {f"rmse_{y}": np.sqrt((res[res.year == y]["residual"] ** 2).mean())
+        rmse = {f"rmse_{y}": np.sqrt((res[res[dim] == y]["residual"] ** 2).mean())
                 for y in years}
         rows.append({
             "model": model,

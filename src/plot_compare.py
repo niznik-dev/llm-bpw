@@ -17,14 +17,29 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from model_meta import badge, best_rank
+from model_meta import badge, cost_rank
 from plot_results import (add_limit_args, draw_year_lines, limits_from_args,
                           short_model, smoothing_note)
-from reference import DEFAULT_REFERENCE, add_residual, resolve_baseline
+from reference import (DEFAULT_REFERENCE, DIM_KIND, DIM_LEGEND, add_residual,
+                       line_dim, resolve_baseline)
+
+
+def run_thinking(task_args):
+    """The run's thinking state from metadata task_args: 'on' | 'off' | 'on*'/'off*'.
+
+    A starred value is the legacy /no_think *intent* (disable_thinking) — unreliable
+    on Together; an unstarred value came from explicit --thinking + extra_body.
+    """
+    th = task_args.get("thinking")
+    if isinstance(th, bool):          # -T thinking=off/on hits the YAML bool trap
+        return "on" if th else "off"
+    if isinstance(th, str) and th:
+        return th
+    return "off*" if task_args.get("disable_thinking", True) else "on*"
 
 
 def load_runs(dirs, min_rows):
-    """Load (model, prompt, df) for each run dir that has both files + enough rows."""
+    """Load (model, prompt, thinking, df) for each run dir with both files + rows."""
     runs = []
     for d in dirs:
         d = Path(d)
@@ -35,7 +50,8 @@ def load_runs(dirs, min_rows):
         if len(df) < min_rows:  # skip backfill / single-sample test stubs
             continue
         m = json.loads(meta.read_text())
-        runs.append({"model": m.get("model", "?"), "prompt": m.get("prompt", ""), "df": df})
+        runs.append({"model": m.get("model", "?"), "prompt": m.get("prompt", ""),
+                     "thinking": run_thinking(m.get("task_args", {})), "df": df})
     return runs
 
 
@@ -70,8 +86,12 @@ def main():
         raise SystemExit("No run folders with results.csv + metadata.json (>= min-rows) found.")
     real = resolve_baseline(args.real, no_real=args.no_real, diff=args.diff)
     rate_limits, resid_limits = limits_from_args(args.ymax, args.resid_max)
-    # Order panels best-available first, then the weaker siblings.
-    runs.sort(key=lambda r: best_rank(short_model(r["model"])))
+    dim = line_dim(runs[0]["df"])   # 'year' (period) or 'cohort' — labels follow
+    # Order panels cheapest output-cost first (Mattie's call).
+    runs.sort(key=lambda r: cost_rank(short_model(r["model"])))
+    # Run-level thinking state for the title (uniform per run series; else 'mixed').
+    think = {r["thinking"] for r in runs}
+    think_note = think.pop() if len(think) == 1 else "mixed"
 
     n = len(runs)
     ncols = math.ceil(math.sqrt(n))
@@ -108,24 +128,26 @@ def main():
         legend_ax = hidden[0]
         legend_ax.set_visible(True)
         legend_ax.axis("off")
-        legend_ax.legend(handles, labels, title="Year", loc="center")
+        legend_ax.legend(handles, labels, title=DIM_LEGEND[dim], loc="center")
     else:
-        fig.legend(handles, labels, title="Year",
+        fig.legend(handles, labels, title=DIM_LEGEND[dim],
                    loc="upper right", bbox_to_anchor=(1.0, 1.0))
     fig.supxlabel("Age")
+    kind = DIM_KIND[dim].lower()   # 'period' | 'cohort'
     if args.diff:
         fig.supylabel("Model − observed (births per woman)")
-        title = "Model residuals vs observed (HFD) — age-specific fertility"
+        title = f"Model residuals vs observed (HFD) — {kind} age-specific fertility"
     else:
-        fig.supylabel("Births per woman (next 12 months)")
-        title = "Model comparison — age-specific fertility schedules"
+        fig.supylabel("Births per woman")
+        title = f"Model comparison — {kind} age-specific fertility schedules"
+    title += f"  ·  thinking {think_note.upper()}"
     subnotes = []
     if real is not None and not args.diff:
         subnotes.append("dashed = observed (HFD)")
     note = smoothing_note(args.smooth)
     if note:
         subnotes.append(note)
-    subnotes.append("badge: ★ best-avail / ○ alt · thinking ● on / ○ off / ◐ amb")
+    subnotes.append("panels cheapest→priciest · badge $out/1M · ★ best / ○ alt")
     if subnotes:
         title += "\n(" + " · ".join(subnotes) + ")"
     fig.suptitle(title)

@@ -20,9 +20,19 @@
 # Cohort grid = data/grids/grid_denmark_cohort.csv (cohorts 1933/1945/1955/1974,
 # Shared-A). Baseline for scoring = data/baselines/hfd_denmark_cohort_asfr.csv.
 set -u
+# THINKING=off (default) | on. The ON run uses a generous token ceiling so we can
+# LEARN each model's real budget from the logs (thinking OFF needs almost none).
+THINKING="${THINKING:-off}"
 GRID="data/grids/grid_denmark_cohort.csv"
-RUNS="data/runs/$(date +%Y%m%d)_dk_cohort"
-COMMON="--prompt cohort_baseline --grid $GRID --thinking off --runs-dir $RUNS"
+if [ "$THINKING" = "on" ]; then
+  RUNS="data/runs/$(date +%Y%m%d)_dk_cohort_thinkON"
+  BUDGET="--max-tokens 50000"   # catches GLM's runaway cells (most finish ~1k)
+else
+  RUNS="data/runs/$(date +%Y%m%d)_dk_cohort"
+  BUDGET=""
+fi
+COMMON="--prompt cohort_baseline --grid $GRID --thinking $THINKING --runs-dir $RUNS $BUDGET"
+echo "### thinking=$THINKING -> $RUNS ###"
 
 # "<together id>|<extra flags>" — streaming only where verified.
 MODELS=(

@@ -25,15 +25,15 @@ from pathlib import Path
 
 import pandas as pd
 
-KEY = ["year", "age", "sex", "country"]
 # Stage retries OUTSIDE any runs-dir so the plotters' recursive globs never pick
 # them up as extra "models"; it (and its own nulls_log) is deleted after use.
 SCRATCH = Path("data/_retry")
 
 
-def retry_run(d, factor):
+def retry_run(d, factor, stream=True):
     """Re-query d's nulls at factor x tokens; merge, tag, preserve log. Returns
-    (attempted, remaining)."""
+    (attempted, remaining). Matches the run's line dimension (year|cohort) and
+    thinking control (explicit --thinking, else the legacy /no_think toggle)."""
     df = pd.read_csv(d / "results.csv")
     if "backfilled" not in df.columns:
         df["backfilled"] = False
@@ -41,28 +41,37 @@ def retry_run(d, factor):
     if nulls.empty:
         return 0, 0
 
+    dim = "cohort" if "cohort" in df.columns else "year"
+    key = [dim, "age", "sex", "country"]
     meta = json.loads((d / "metadata.json").read_text())
     targs = meta.get("task_args") or {}
     cap = int(targs.get("max_tokens") or 512)
     new_cap = cap * factor
-    disable_thinking = targs.get("disable_thinking", True)
+    thinking = targs.get("thinking")
+    if isinstance(thinking, bool):  # -T bool trap: off->False, on->True
+        thinking = "on" if thinking else "off"
 
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     retry_name = f"{d.name}_bf_{ts}"
     grid = d / "retry_grid.csv"
-    nulls[KEY].to_csv(grid, index=False)
+    nulls[key].to_csv(grid, index=False)
 
     shutil.rmtree(SCRATCH, ignore_errors=True)
     cmd = ["python", "src/run_probe.py", "--model", meta["model"], "--grid", str(grid),
-           "--max-tokens", str(new_cap), "--stream",
+           "--prompt", meta.get("prompt") or "baseline",  # match the run's prompt variant
+           "--max-tokens", str(new_cap),
            "--runs-dir", str(SCRATCH), "--run-name", retry_name]
-    if disable_thinking is False:
+    if stream:
+        cmd.append("--stream")
+    if isinstance(thinking, str) and thinking:      # explicit per-model control
+        cmd += ["--thinking", thinking]
+    elif targs.get("disable_thinking", True) is False:  # legacy /no_think toggle
         cmd.append("--allow-thinking")
     subprocess.run(cmd, check=True)
 
     retry_dir = SCRATCH / retry_name
-    bf = pd.read_csv(retry_dir / "results.csv").set_index(KEY)
-    o = df.set_index(KEY)
+    bf = pd.read_csv(retry_dir / "results.csv").set_index(key)
+    o = df.set_index(key)
     o["raw_reply"] = o["raw_reply"].astype(object)
     idx = bf.index[bf["births_per_woman"].notna()]  # profiles the retry recovered
     o.loc[idx, "births_per_woman"] = bf.loc[idx, "births_per_woman"].values
@@ -93,6 +102,8 @@ def main():
     p.add_argument("runs_dir")
     p.add_argument("--factor", type=int, default=2, help="Token-budget multiplier (default: 2x).")
     p.add_argument("--only", help="Restrict to one run folder name (for a cheap smoke test).")
+    p.add_argument("--no-stream", action="store_true",
+                   help="Retry without --stream (e.g. models that hang on it).")
     args = p.parse_args()
 
     base = Path(args.runs_dir)
@@ -102,7 +113,7 @@ def main():
 
     grand_before = grand_after = 0
     for d in runs:
-        before, after = retry_run(d, args.factor)
+        before, after = retry_run(d, args.factor, stream=not args.no_stream)
         if before:
             grand_before += before
             grand_after += after

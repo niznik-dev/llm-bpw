@@ -28,6 +28,7 @@ from inspect_ai.model import GenerateConfig
 from inspect_ai.scorer import Score, Target, mean, scorer
 from inspect_ai.solver import chain, generate, system_message
 
+import openai_stream_patch  # noqa: F401  (side effect: tolerate Together's bad logprobs)
 from model_meta import thinking_extra_body
 from probe import coerce_profile, parse_birth_rate, system_prompt, user_prompt
 

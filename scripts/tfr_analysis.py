@@ -18,6 +18,7 @@ total), and where displaced mass goes — younger, older, or both.
 """
 
 import argparse
+import json
 import math
 import sys
 from pathlib import Path
@@ -29,14 +30,33 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))            # scripts/ -> score_models
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from score_models import load_runs  # noqa: E402
-from reference import (DEFAULT_REFERENCE, add_residual,  # noqa: E402
-                       load_reference)
+from model_meta import cost_rank  # noqa: E402
+from reference import (DEFAULT_REFERENCE, DIM_LEGEND, add_residual,  # noqa: E402
+                       line_dim, load_reference)
 from plot_results import YEAR_COLORS, short_model  # noqa: E402
+
+
+def read_thinking(runs_dir):
+    """Run-level thinking state ('on'/'off'/'on*'/'off*') from a run's metadata."""
+    for meta in sorted(Path(runs_dir).glob("*/metadata.json")):
+        ta = json.loads(meta.read_text()).get("task_args", {})
+        th = ta.get("thinking")
+        if isinstance(th, bool):
+            return "on" if th else "off"
+        if isinstance(th, str) and th:
+            return th
+        return "off*" if ta.get("disable_thinking", True) else "on*"
+    return "?"
 
 DEFAULT_YEARS = [1920, 1960, 1990, 2024]  # Denmark grid; override with --years
 PEAK_BAND = 2  # ages within +/- this of the observed peak count as "at the peak"
 CONTROL = "(observed HFD)"  # label for the real-baseline control row
 ENSEMBLE = "Multimodel mean"  # label for the mean-across-models aggregate row
+
+# The line dimension ('year' period / 'cohort'), set by build_matched, and the
+# name of ∑ births/woman under each: TFR (period total) vs CCF (completed cohort).
+DIM = "year"
+METRIC = {"year": "TFR", "cohort": "CCF"}
 
 
 def build_matched(runs_dir, real_path, sex, years):
@@ -53,14 +73,16 @@ def build_matched(runs_dir, real_path, sex, years):
     ref = ref[ref["sex"] == sex]
     country = ref["country"].iloc[0] if "country" in ref.columns else "?"
     big = load_runs(runs_dir, sex)
+    global DIM
+    DIM = line_dim(big)  # 'year' (period) or 'cohort' — drives grouping + labels
 
     frames = []
     for model, mdf in big.groupby("model"):
-        m = add_residual(mdf, ref)  # matched (year, age, sex); adds _observed, residual
-        m = m[m["year"].isin(years)].copy()
+        m = add_residual(mdf, ref)  # matched (dim, age, sex); adds _observed, residual
+        m = m[m[DIM].isin(years)].copy()
         if m.empty:
             continue
-        g = m.groupby("year")
+        g = m.groupby(DIM)
         m["tfr_model"] = g["births_per_woman"].transform("sum")
         m["tfr_real"] = g["_observed"].transform("sum")
         m["norm_model"] = m["births_per_woman"] / m["tfr_model"]
@@ -81,10 +103,10 @@ def ensemble_frame(matched):
     score the *crowd* exactly like an individual model (this is where the
     'tyranny of the majority' RMSE lives).
     """
-    ens = (matched.groupby(["year", "age", "sex"], as_index=False)
+    ens = (matched.groupby([DIM, "age", "sex"], as_index=False)
            .agg(births_per_woman=("births_per_woman", "mean"),
                 _observed=("_observed", "first")))
-    g = ens.groupby("year")
+    g = ens.groupby(DIM)
     ens["tfr_model"] = g["births_per_woman"].transform("sum")
     ens["tfr_real"] = g["_observed"].transform("sum")
     ens["norm_model"] = ens["births_per_woman"] / ens["tfr_model"]
@@ -98,14 +120,14 @@ def ensemble_frame(matched):
 def summarize(matched):
     """One row per (model, year): level (TFR) + shape (displacement) diagnostics."""
     rows = []
-    for (model, year), d in matched.groupby(["model", "year"]):
+    for (model, key), d in matched.groupby(["model", DIM]):
         tfr_m, tfr_r = d["tfr_model"].iloc[0], d["tfr_real"].iloc[0]
         peak_age = d.loc[d["norm_real"].idxmax(), "age"]
         at_peak = d["age"].between(peak_age - PEAK_BAND, peak_age + PEAK_BAND)
         younger = d["age"] < peak_age - PEAK_BAND
         older = d["age"] > peak_age + PEAK_BAND
         rows.append({
-            "model": model, "year": year,
+            "model": model, DIM: key,
             "tfr_model": tfr_m, "tfr_real": tfr_r,
             "tfr_ratio": tfr_m / tfr_r, "tfr_diff": tfr_m - tfr_r,
             "rmse": np.sqrt((d["residual"] ** 2).mean()),             # vs observed, this year
@@ -117,7 +139,7 @@ def summarize(matched):
             "old_shift": d.loc[older, "shape_resid"].sum(),           # >0 = mass pushed older
             "shape_rmse": np.sqrt((d["shape_resid"] ** 2).mean()),
         })
-    return pd.DataFrame(rows).sort_values(["year", "model"]).reset_index(drop=True)
+    return pd.DataFrame(rows).sort_values([DIM, "model"]).reset_index(drop=True)
 
 
 def mean_age(ages, weights):
@@ -138,10 +160,10 @@ def control_rows(summary):
     truth. RMSE and the shape shifts are zero by definition for the baseline.
     """
     rows = []
-    for year, yd in summary.groupby("year"):
+    for key, yd in summary.groupby(DIM):
         r = yd.iloc[0]
         rows.append({
-            "model": CONTROL, "year": year,
+            "model": CONTROL, DIM: key,
             "tfr_model": r["tfr_real"], "tfr_real": r["tfr_real"],
             "tfr_ratio": 1.0, "tfr_diff": 0.0, "rmse": 0.0,
             "mean_age": r["mean_age_real"], "mean_age_real": r["mean_age_real"],
@@ -152,81 +174,84 @@ def control_rows(summary):
 
 
 def report(summary, years):
-    """Print the level table + a shape/displacement read for the boom year."""
-    boom = 1960 if 1960 in years else years[len(years) // 2]
+    """Print the level table + a shape/displacement read for the focus key."""
+    metric = METRIC[DIM]                                   # TFR (period) | CCF (cohort)
+    label = DIM_LEGEND[DIM].lower()                        # 'year' | 'birth cohort'
+    focus = 1960 if 1960 in years else years[len(years) // 2]
 
-    print("\n=== LEVEL — is total fertility conserved? (TFR_model vs TFR_real) ===")
+    print(f"\n=== LEVEL — is {metric} conserved? ({metric}_model vs {metric}_real) ===")
     print(f"{'model':<28}" + "".join(f"{y:>16}" for y in years))
     print(f"{'':28}" + "".join(f"{'(ratio)':>16}" for _ in years))
     for model, md in summary.groupby("model"):
-        by_year = md.set_index("year")
+        by_key = md.set_index(DIM)
         cells = []
         for y in years:
-            if y in by_year.index:
-                r = by_year.loc[y]
+            if y in by_key.index:
+                r = by_key.loc[y]
                 cells.append(f"{r['tfr_model']:.2f}/{r['tfr_real']:.2f} {r['tfr_ratio']:.0%}")
             else:
                 cells.append("--")
         print(f"{model:<28}" + "".join(f"{c:>16}" for c in cells))
 
-    print(f"\n=== SHAPE — where does displaced mass go? ({boom}, unit-area) ===")
+    print(f"\n=== SHAPE — where does displaced mass go? ({focus}, unit-area) ===")
     print("  peak_band_shift <0 = flattened peak · young/old_shift >0 = mass moved there")
     print(f"{'model':<28}{'peak_age':>9}{'peak':>9}{'younger':>9}{'older':>9}{'shape_rmse':>12}")
-    bd = summary[summary["year"] == boom]
-    for _, r in bd.iterrows():
+    for _, r in summary[summary[DIM] == focus].iterrows():
         print(f"{r['model']:<28}{r['peak_age']:>9}{r['peak_band_shift']:>+9.3f}"
               f"{r['young_shift']:>+9.3f}{r['old_shift']:>+9.3f}{r['shape_rmse']:>12.4f}")
 
-    print(f"\n=== TFR · RMSE · mean age of childbearing, per era "
+    print(f"\n=== {metric} · RMSE · mean age of childbearing, per {label} "
           f"({CONTROL} = observed) ===")
-    for year in years:
-        yd = summary[summary["year"] == year].copy()
+    for key in years:
+        yd = summary[summary[DIM] == key].copy()
         yd["_pin"] = yd["model"].map(pin_rank)  # control, ensemble, then best RMSE
         yd = yd.sort_values(["_pin", "rmse"], ascending=[True, True])
-        print(f"\n  {year}")
-        print(f"    {'model':<28}{'TFR':>7}{'RMSE':>9}{'mean age':>10}")
+        print(f"\n  {key}")
+        print(f"    {'model':<28}{metric:>7}{'RMSE':>9}{'mean age':>10}")
         for _, r in yd.iterrows():
             rmse = "  --  " if r["model"] == CONTROL else f"{r['rmse']:.4f}"
             print(f"    {r['model']:<28}{r['tfr_model']:>7.2f}{rmse:>9}{r['mean_age']:>10.1f}")
 
     ratios = (summary[~summary["model"].isin([CONTROL, ENSEMBLE])]
-              .set_index(["model", "year"])["tfr_ratio"])
-    print(f"\nTFR ratio across all (model, year): median {ratios.median():.0%}, "
+              .set_index(["model", DIM])["tfr_ratio"])
+    print(f"\n{metric} ratio across all (model, {label}): median {ratios.median():.0%}, "
           f"range {ratios.min():.0%}–{ratios.max():.0%}  "
           f"(100% = level perfectly conserved).")
 
 
-def plot_level(summary, years, out, country="?"):
-    """One panel per year: bar = each model's TFR, dashed line = observed TFR."""
-    models = sorted(summary["model"].unique())
+def plot_level(summary, years, out, country="?", thinking="?"):
+    """One panel per key: bar = each model's TFR/CCF, dashed line = observed."""
+    metric = METRIC[DIM]
+    models = sorted(summary["model"].unique(), key=cost_rank)  # cheapest -> priciest
     ncols = math.ceil(math.sqrt(len(years)))
     nrows = math.ceil(len(years) / ncols)
     fig, axes = plt.subplots(nrows, ncols, figsize=(1.1 * len(models) * ncols / 2 + 2,
                                                     3.6 * nrows), squeeze=False)
     axes = axes.flatten()
-    for ax, year, color in zip(axes, sorted(years), YEAR_COLORS):
-        d = summary[summary["year"] == year].set_index("model").reindex(models)
+    for ax, key, color in zip(axes, sorted(years), YEAR_COLORS):
+        d = summary[summary[DIM] == key].set_index("model").reindex(models)
         ax.bar(range(len(models)), d["tfr_model"], color=color, alpha=0.85)
         real = d["tfr_real"].mean()
-        ax.axhline(real, ls="--", color="black", lw=1.2, label=f"observed TFR = {real:.2f}")
+        ax.axhline(real, ls="--", color="black", lw=1.2, label=f"observed {metric} = {real:.2f}")
         ax.set_xticks(range(len(models)))
         ax.set_xticklabels([short_model(m) for m in models], rotation=90, fontsize=7)
-        ax.set_title(str(year))
-        ax.set_ylabel("TFR (∑ births/woman)")
+        ax.set_title(str(key))
+        ax.set_ylabel(f"{metric} (∑ births/woman)")
         ax.legend(fontsize=8, loc="upper right")
         ax.grid(True, axis="y", alpha=0.3)
     for ax in axes[len(years):]:
         ax.set_visible(False)
-    fig.suptitle(f"{country} — fertility conservation: derived TFR vs observed (HFD)\n"
-                 "(bar = model's summed schedule · dashed = real total)")
+    fig.suptitle(f"{country} — fertility conservation: derived {metric} vs observed (HFD)"
+                 f"  ·  thinking {thinking.upper()}\n"
+                 "(bar = model's summed schedule · dashed = real total · models cheapest→priciest)")
     fig.tight_layout()
     fig.savefig(out, dpi=150)
     print(f"\nWrote {out}")
 
 
-def plot_shape(matched, years, out, country="?"):
+def plot_shape(matched, years, out, country="?", thinking="?"):
     """Postage stamps of normalized shape residual (norm_model - norm_real) vs age."""
-    models = sorted(matched["model"].unique())
+    models = sorted(matched["model"].unique(), key=cost_rank)  # cheapest -> priciest
     ncols = math.ceil(math.sqrt(len(models)))
     nrows = math.ceil(len(models) / ncols)
     fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.2 * nrows),
@@ -234,12 +259,12 @@ def plot_shape(matched, years, out, country="?"):
     axes = axes.flatten()
     for ax, model in zip(axes, models):
         md = matched[matched["model"] == model]
-        for i, year in enumerate(sorted(years)):
-            yd = md[md["year"] == year].sort_values("age")
+        for i, key in enumerate(sorted(years)):
+            yd = md[md[DIM] == key].sort_values("age")
             if yd.empty:
                 continue
             ax.plot(yd["age"], yd["shape_resid"], color=YEAR_COLORS[i % len(YEAR_COLORS)],
-                    label=str(year), lw=1.4)
+                    label=str(key), lw=1.4)
         ax.axhline(0, color="grey", lw=0.8)
         ax.set_ylim(-0.05, 0.05)
         ax.set_title(short_model(model), fontsize=9)
@@ -251,19 +276,21 @@ def plot_shape(matched, years, out, country="?"):
     if len(hidden):
         hidden[0].set_visible(True)
         hidden[0].axis("off")
-        hidden[0].legend(handles, labels, title="Year", loc="center")
+        hidden[0].legend(handles, labels, title=DIM_LEGEND[DIM], loc="center")
     else:
-        fig.legend(handles, labels, title="Year", loc="upper right", bbox_to_anchor=(1.0, 1.0))
+        fig.legend(handles, labels, title=DIM_LEGEND[DIM], loc="upper right",
+                   bbox_to_anchor=(1.0, 1.0))
     fig.supxlabel("Age")
     fig.supylabel("Shape residual (model − observed, unit-area schedules)")
-    fig.suptitle(f"{country} — fertility conservation: shape error with the level removed\n"
-                 "(each schedule normalized to its own TFR · deficit at peak + surplus on flanks = mass moved, not lost)")
+    fig.suptitle(f"{country} — fertility conservation: shape error with the level removed"
+                 f"  ·  thinking {thinking.upper()}\n"
+                 f"(each schedule normalized to its own {METRIC[DIM]} · deficit at peak + surplus on flanks = mass moved, not lost)")
     fig.tight_layout()
     fig.savefig(out, dpi=150)
     print(f"Wrote {out}")
 
 
-def plot_table(full, years, out, country="?"):
+def plot_table(full, years, out, country="?", thinking="?"):
     """Render the per-era TFR · RMSE · mean-age table as a readable image.
 
     One panel per era; models sorted by RMSE under a shaded observed-HFD control
@@ -277,10 +304,10 @@ def plot_table(full, years, out, country="?"):
                              figsize=(6.6 * ncols, 0.34 * (n_models + 2) * nrows + 0.8))
     axes = axes.flatten()
     cmap = plt.cm.YlOrRd
-    cols = ["model", "TFR", "RMSE", "mean age"]
-    for ax, year in zip(axes, sorted(years)):
+    cols = ["model", METRIC[DIM], "RMSE", "mean age"]
+    for ax, key in zip(axes, sorted(years)):
         ax.axis("off")
-        yd = full[full["year"] == year].copy()
+        yd = full[full[DIM] == key].copy()
         yd["_pin"] = yd["model"].map(pin_rank)   # control, then ensemble, then models
         yd = yd.sort_values(["_pin", "rmse"], ascending=[True, True])
         vals = yd.loc[yd["_pin"] == 2, "rmse"]   # heat scale over the real models only
@@ -309,10 +336,11 @@ def plot_table(full, years, out, country="?"):
             if cc == 0 and rr > 0:            # left-align model names
                 cell.get_text().set_ha("left")
                 cell.PAD = 0.04
-        ax.set_title(str(year), fontweight="bold", fontsize=11)
+        ax.set_title(str(key), fontweight="bold", fontsize=11)
     for ax in axes[len(years):]:
         ax.axis("off")
-    fig.suptitle(f"{country} — derived TFR · RMSE · mean age of childbearing, per era\n"
+    fig.suptitle(f"{country} — derived {METRIC[DIM]} · RMSE · mean age of childbearing, "
+                 f"per {DIM_LEGEND[DIM].lower()}  ·  thinking {thinking.upper()}\n"
                  "(blue = observed HFD control · green = multimodel mean · "
                  "RMSE shaded darker = worse · models sorted best→worst)",
                  fontsize=13, fontweight="bold")
@@ -337,6 +365,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     matched, country = build_matched(args.runs_dir, args.real, args.sex, years)
+    thinking = read_thinking(args.runs_dir)
     summary = summarize(matched)
     ens_summary = summarize(ensemble_frame(matched))
     full = pd.concat([summary, ens_summary, control_rows(summary)], ignore_index=True)
@@ -346,9 +375,9 @@ def main():
     print(f"\nWrote {out_dir / 'tfr_summary.csv'}")
     # Plots exclude the control: the observed baseline is already the dashed
     # line (level) and the zero line (shape).
-    plot_level(summary, years, out_dir / "tfr_level.png", country)
-    plot_shape(matched, years, out_dir / "tfr_shape.png", country)
-    plot_table(full, years, out_dir / "tfr_table.png", country)
+    plot_level(summary, years, out_dir / "tfr_level.png", country, thinking)
+    plot_shape(matched, years, out_dir / "tfr_shape.png", country, thinking)
+    plot_table(full, years, out_dir / "tfr_table.png", country, thinking)
 
 
 if __name__ == "__main__":
