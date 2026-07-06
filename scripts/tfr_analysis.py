@@ -81,17 +81,16 @@ def ensemble_frame(matched):
     score the *crowd* exactly like an individual model (this is where the
     'tyranny of the majority' RMSE lives).
     """
-    # Roster guard: the crowd mean is only apples-to-apples if every (year, age)
-    # cell averages the *same* set of models. add_residual joins each model to the
-    # baseline independently, so a null leaves an age short — the mean silently
-    # switches rosters mid-schedule. Backfilled runs are full; warn if one isn't.
+    # Guard: the mean is only apples-to-apples if every (year, age) cell averages
+    # the same models. add_residual joins each model independently, so a null drops
+    # that model from an age, thinning the average there. Warn when that happens.
     n_models = matched["model"].nunique()
-    crew = matched.groupby(["year", "age", "sex"])["model"].nunique()
-    short = crew[crew < n_models]
+    models_per_cell = matched.groupby(["year", "age", "sex"])["model"].nunique()
+    short = models_per_cell[models_per_cell < n_models]
     if len(short):
-        print(f"⚠ ensemble: {len(short)}/{len(crew)} (year, age) cells average "
-              f"< {n_models} models (min {int(short.min())}) — ragged coverage, "
-              "crowd mean mixes rosters across ages.", file=sys.stderr)
+        print(f"⚠ ensemble: {len(short)}/{len(models_per_cell)} (year, age) cells "
+              f"average < {n_models} models (min {int(short.min())}) — ragged "
+              "coverage skews the mean across ages.", file=sys.stderr)
 
     ens = (matched.groupby(["year", "age", "sex"], as_index=False)
            .agg(births_per_woman=("births_per_woman", "mean"),
