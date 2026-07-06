@@ -8,14 +8,14 @@ Local dev/smoke-test on a small Qwen (auto-downloads from the HF hub):
 
     inspect eval src/inspect_task.py@bpw \
         --model hf/Qwen/Qwen3-4B \
-        -T grid_path=$PWD/data/sweep_grid.csv -T prompt=era_prior --limit 8
+        -T grid_path=$PWD/data/grids/sweep_grid.csv -T prompt=era_prior --limit 8
 
 On della (large local Qwen) — see inspect/run_della.slurm:
 
     inspect eval src/inspect_task.py@bpw \
         --model hf/Qwen3-14B \
         -M model_path=/scratch/gpfs/MSALGANIK/pretrained-llms/Qwen3-14B \
-        -T grid_path=$PWD/data/grid.csv -T prompt=era_prior
+        -T grid_path=$PWD/data/grids/grid.csv -T prompt=era_prior
 
 Then turn the .eval log into a plot-ready results.csv with inspect_to_csv.py.
 """
@@ -28,6 +28,8 @@ from inspect_ai.model import GenerateConfig
 from inspect_ai.scorer import Score, Target, mean, scorer
 from inspect_ai.solver import chain, generate, system_message
 
+import openai_stream_patch  # noqa: F401  (side effect: tolerate Together's bad logprobs)
+from model_meta import thinking_extra_body
 from probe import coerce_profile, parse_birth_rate, system_prompt, user_prompt
 
 
@@ -75,20 +77,36 @@ _NO_THINK = "/no_think"
 
 
 @task
-def bpw(grid_path: str = "data/grid.csv",
+def bpw(grid_path: str = "data/grids/grid.csv",
         prompt: str = "baseline",
         temperature: float = 1e-7,   # near-greedy; hf/transformers rejects 0.0
         max_tokens: int = 512,        # room for reasoning models to think + answer
         disable_thinking: bool = True,
+        thinking: str = "",           # "off"|"on": explicit per-model extra_body control
+        model_key: str = "",          # short model name, for the registry lookup
         give_hint: bool = False,
         ask_decimal: bool = True) -> Task:
     """Births-per-woman probe over a profile grid, using one prompt variant.
 
+    Thinking control: pass thinking="off"/"on" + model_key to set the exact
+    per-model reasoning `extra_body` from the registry (Together — authoritative).
+    If the model isn't in the registry (e.g. an hf/ local model), fall back to the
+    /no_think soft switch. With neither, the legacy disable_thinking default holds.
+
     give_hint / ask_decimal are opt-in prompt scaffolding (see probe.py); both
     default to the simple setting so a capable model gets a bare question.
     """
+    # Inspect's -T parser reads `off`/`on` as YAML booleans, so a passed
+    # thinking=off arrives as False. Map it back to the string state.
+    if isinstance(thinking, bool):
+        thinking = "on" if thinking else "off"
     system = system_prompt(prompt, give_hint=give_hint, ask_decimal=ask_decimal)
-    if disable_thinking:
+    extra_body = None
+    if thinking:
+        extra_body = thinking_extra_body(model_key, thinking) or None
+        if extra_body is None and thinking == "off":
+            system = f"{system}\n{_NO_THINK}"   # registry miss -> soft-switch fallback
+    elif disable_thinking:
         system = f"{system}\n{_NO_THINK}"
     return Task(
         dataset=_load_samples(grid_path, prompt),
@@ -97,5 +115,6 @@ def bpw(grid_path: str = "data/grid.csv",
             generate(),
         ),
         scorer=births_scorer(),
-        config=GenerateConfig(temperature=temperature, max_tokens=max_tokens),
+        config=GenerateConfig(temperature=temperature, max_tokens=max_tokens,
+                              extra_body=extra_body),
     )

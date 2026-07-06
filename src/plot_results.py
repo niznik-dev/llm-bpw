@@ -18,7 +18,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from reference import DEFAULT_REFERENCE, add_residual, resolve_baseline
+from reference import (DEFAULT_REFERENCE, DIM_KIND, DIM_LEGEND, add_residual,
+                       line_dim, resolve_baseline)
 
 # Year palette, applied in ascending year order (low -> high).
 YEAR_COLORS = ["#E8731A", "#9AA63D", "#17BECF", "#B07CC6"]  # orange, sunburnt-grass green, teal, light purple
@@ -90,14 +91,15 @@ def draw_year_lines(ax, df, smooth=1, real=None, value_col="births_per_woman",
         boom at ~0.27) or whose residuals exceed ±0.15.
     """
     resid = value_col == "residual"
-    years = sorted(df["year"].unique())  # low -> high, to match palette
-    for i, yr in enumerate(years):
+    dim = line_dim(df)                    # 'year' (period) or 'cohort'
+    keys = sorted(df[dim].unique())       # low -> high, to match palette
+    for i, key in enumerate(keys):
         color = YEAR_COLORS[i % len(YEAR_COLORS)]
-        sub = df[df["year"] == yr].sort_values("age")
+        sub = df[df[dim] == key].sort_values("age")
         y = sub[value_col].rolling(smooth, center=True, min_periods=1).mean()
-        ax.plot(sub["age"], y, color=color, linewidth=2.0, label=str(yr))
+        ax.plot(sub["age"], y, color=color, linewidth=2.0, label=str(key))
         if real is not None and not resid:
-            rsub = real[real["year"] == yr].sort_values("age")
+            rsub = real[real[dim] == key].sort_values("age")
             ax.plot(rsub["age"], rsub["births_per_woman"], color=color,
                     linestyle="--", linewidth=1.4, alpha=0.85)
     ax.set_xlim(*AGE_LIMITS)
@@ -112,6 +114,7 @@ def plot_schedules(df, sex="Female", smooth=1, model=None, real=None, diff=False
                    rate_limits=RATE_LIMITS, resid_limits=RESID_LIMITS):
     """Draw one curve per year (schedules, or residuals if ``diff``). Returns Figure."""
     df = df[df["sex"] == sex]
+    dim = line_dim(df)
     value_col = "births_per_woman"
     if diff:
         df = add_residual(df, real)
@@ -128,9 +131,9 @@ def plot_schedules(df, sex="Female", smooth=1, model=None, real=None, diff=False
         ax.set_ylabel("Model − observed (births per woman)")
         ax.set_title(f"Fertility residuals — {who} ({sex})")
     else:
-        ax.set_ylabel("Births per woman (this year)")
-        ax.set_title(f"Period fertility schedules — {who} ({sex})")
-    ax.legend(title="Year")
+        ax.set_ylabel("Births per woman")
+        ax.set_title(f"{DIM_KIND[dim]} fertility schedules — {who} ({sex})")
+    ax.legend(title=DIM_LEGEND[dim])
     ax.grid(True, alpha=0.3)
 
     caption = []
