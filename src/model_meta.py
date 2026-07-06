@@ -39,17 +39,36 @@ def meta_for(model, registry=None):
     return registry.get(model, {
         "is_best": False, "thinking_configured": "ambiguous", "provider": "?",
         "params_total_b": None, "params_active_b": None,
+        "cost_output_per_mtok": None,
     })
 
 
+def cost_rank(model, registry=None):
+    """Sort key: cheapest output price first; unknown/None costs sort last."""
+    cost = meta_for(model, registry).get("cost_output_per_mtok")
+    return (float("inf") if cost is None else cost, model)
+
+
 def best_rank(model, registry=None):
-    """Sort key: best-available models first, then by name."""
+    """Sort key: best-available models first, then by name (legacy ordering)."""
     return (0 if meta_for(model, registry).get("is_best") else 1, model)
 
 
 def badge(model, registry=None):
-    """One-line annotation for a panel title: best-flag · configured-thinking."""
+    """One-line annotation for a panel title: output cost · best-flag."""
     m = meta_for(model, registry)
+    cost = m.get("cost_output_per_mtok")
+    price = f"${cost:.2f}/M" if cost is not None else "$?/M"
     flag = "★ best" if m.get("is_best") else "○ alt"
-    think = THINKING_GLYPH.get(m.get("thinking_configured", "ambiguous"), "◐ amb")
-    return f"{flag} · {think}"
+    return f"{price} · {flag}"
+
+
+def thinking_extra_body(model, state, registry=None):
+    """`extra_body` dict to force a model's reasoning `state` ('off'|'on').
+
+    Returns the per-model control from the registry (Qwen/Gemma/Nemotron use
+    chat_template_kwargs, GLM uses reasoning, MiniMax uses thinking) for Inspect's
+    GenerateConfig(extra_body=...). Returns {} when the model isn't configured
+    (e.g. an hf/ local model), so the caller can fall back to the /no_think path.
+    """
+    return meta_for(model, registry).get(f"thinking_{state}") or {}

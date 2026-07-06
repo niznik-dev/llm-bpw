@@ -9,11 +9,23 @@ from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_REFERENCE = Path("data/hfd_denmark_asfr.csv")
+DEFAULT_REFERENCE = Path("data/baselines/hfd_denmark_period_asfr.csv")
 
 # Real ASFR peaks below ~0.2; a model value above this is a parse leak (e.g. a
 # TFR that slipped out of the reasoning) and would otherwise blow up a residual.
 MAX_PLAUSIBLE = 0.3
+
+# A schedule's "line dimension" — the field identifying one curve: calendar
+# `year` (period) or birth `cohort` (cohort). Auto-detected everywhere so the
+# same tooling serves both axes. Display labels for legends/titles alongside.
+LINE_DIMS = ("year", "cohort")
+DIM_LEGEND = {"year": "Year", "cohort": "Birth cohort"}
+DIM_KIND = {"year": "Period", "cohort": "Cohort"}
+
+
+def line_dim(df):
+    """The line dimension present in df: 'cohort' if that column exists, else 'year'."""
+    return next((d for d in LINE_DIMS if d in df.columns), "year")
 
 
 def load_reference(path=DEFAULT_REFERENCE):
@@ -47,7 +59,8 @@ def add_residual(model_df, real_df, value="births_per_woman",
     m = model_df.copy()
     if max_plausible is not None:
         m = m[m[value] <= max_plausible]
-    ref = real_df.rename(columns={value: "_observed"})[["year", "age", "sex", "_observed"]]
-    m = m.merge(ref, on=["year", "age", "sex"], how="inner")
+    keys = [line_dim(m), "age", "sex"]  # match on year|cohort + age + sex
+    ref = real_df.rename(columns={value: "_observed"})[keys + ["_observed"]]
+    m = m.merge(ref, on=keys, how="inner")
     m["residual"] = m[value] - m["_observed"]
     return m

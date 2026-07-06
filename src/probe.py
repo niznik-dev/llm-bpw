@@ -97,18 +97,75 @@ PROMPTS = {
             "Age-specific fertility rate (births per woman):"
         ),
     },
+    # --- Cohort variant: a birth cohort followed through age (NOT period) ------
+    # Asks the rate at age A for women BORN in year C — the cohort mirror of
+    # "baseline". Give-away discipline holds: no completed-fertility total, no
+    # shape, no summation cue; just the per-age rate for that birth cohort.
+    "cohort_baseline": {
+        "system": (
+            "You are a demographer estimating age-specific fertility rates. "
+            "Estimate the age-specific fertility rate for the birth cohort below "
+            "— the expected number of births per woman of this age, among women "
+            "born in this country in the given birth year."
+        ),
+        "user": lambda p: (
+            "Profile:\n"
+            f"- Birth year (cohort): {p['cohort']}\n"
+            f"- Age: {p['age']}\n"
+            f"- Sex: {p['sex']}\n"
+            f"- Country: {p['country']}\n"
+            "Age-specific fertility rate (births per woman) at this age, for "
+            "this birth cohort?"
+        ),
+    },
+    # As cohort_baseline, but spell out the calendar year the cohort reaches this
+    # age (birth year + age) — a Lexis coordinate, not a give-away. Tests whether
+    # naming the "when" disambiguates cohort from period.
+    "cohort_year": {
+        "system": (
+            "You are a demographer estimating age-specific fertility rates. "
+            "Estimate the age-specific fertility rate for the birth cohort below "
+            "— the expected number of births per woman of this age, among women "
+            "born in this country in the given birth year. (Women born in the "
+            "birth year reach the given age during the listed calendar year.)"
+        ),
+        "user": lambda p: (
+            "Profile:\n"
+            f"- Birth year (cohort): {p['cohort']}\n"
+            f"- Age: {p['age']}\n"
+            f"- Calendar year at this age: {p['cohort'] + p['age']}\n"
+            f"- Sex: {p['sex']}\n"
+            f"- Country: {p['country']}\n"
+            "Age-specific fertility rate (births per woman) at this age, for "
+            "this birth cohort?"
+        ),
+    },
 }
 
 DEFAULT_PROMPT = "baseline"
 
-# Fields every profile row carries, and their types (for CSV coercion).
-# `year` is the calendar (period) year — the line identity in a period schedule.
-PROFILE_FIELDS = {"year": int, "age": int, "sex": str, "country": str}
+# A schedule's "line dimension" — the field identifying one curve: calendar
+# `year` (period) or birth `cohort` (cohort). A grid carries exactly one; the
+# rest of the fields are common. Everything downstream auto-detects which.
+LINE_DIMENSIONS = ("year", "cohort")
+_COMMON_FIELDS = {"age": int, "sex": str, "country": str}
+# Period default, kept for callers that assume the classic schema.
+PROFILE_FIELDS = {"year": int, **_COMMON_FIELDS}
+
+
+def profile_schema(row):
+    """Ordered {field: caster} for a row — its line dimension + the common fields.
+
+    Detects `year` vs `cohort` from the row's keys (defaults to year), so period
+    and cohort grids flow through the same probe/parse path.
+    """
+    dim = next((d for d in LINE_DIMENSIONS if d in row), "year")
+    return {dim: int, **_COMMON_FIELDS}
 
 
 def coerce_profile(row):
-    """Coerce a raw CSV/dict row into a typed profile dict (ints where needed)."""
-    return {k: cast(row[k]) for k, cast in PROFILE_FIELDS.items()}
+    """Coerce a raw CSV/dict row into a typed profile dict (period or cohort)."""
+    return {k: cast(row[k]) for k, cast in profile_schema(row).items()}
 
 
 def system_prompt(prompt=DEFAULT_PROMPT, give_hint=False, ask_decimal=True):
