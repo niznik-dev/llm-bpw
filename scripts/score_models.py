@@ -2,7 +2,8 @@
 
 For each run under --runs-dir, computes the root-mean-square error of the model's
 age-specific fertility schedule vs the HFD baseline — overall and per calendar
-year — and writes a ranked leaderboard.csv.
+year — and writes a per-model metrics table (model_metrics.csv), sorted by
+overall RMSE.
 
     python scripts/score_models.py --runs-dir data/runs/20260701 \
         --real data/baselines/hfd_usa_period_asfr.csv --years 1933 1960 1990 2024
@@ -50,7 +51,7 @@ def main():
     p.add_argument("--years", type=int, nargs="+", default=DEFAULT_YEARS,
                    help="Grid years to report per-year RMSE for (default: %(default)s).")
     p.add_argument("--out", type=Path, default=None,
-                   help="Leaderboard CSV (default: <runs-dir>/leaderboard.csv).")
+                   help="Metrics CSV (default: <runs-dir>/model_metrics.csv).")
     args = p.parse_args()
     years = sorted(args.years)
 
@@ -73,20 +74,20 @@ def main():
             "mae_overall": res["residual"].abs().mean(),
             **rmse,
         })
-    board = pd.DataFrame(rows).sort_values("rmse_overall").reset_index(drop=True)
+    metrics = pd.DataFrame(rows).sort_values("rmse_overall").reset_index(drop=True)
 
-    print(f"\nScored {len(board)} models vs HFD ({args.sex}, {country})  ·  "
+    print(f"\nScored {len(metrics)} models vs HFD ({args.sex}, {country})  ·  "
           f"parse leaks > {MAX_PLAUSIBLE} dropped\n")
-    print("=== RMSE leaderboard (lower = better) ===")
+    print("=== Model metrics · sorted by RMSE (lower = better) ===")
     print(f"{'rank':>4}  {'model':<26}{'RMSE':>8}{'MAE':>8}   " +
           "".join(f"{y:>7}" for y in years))
-    for i, r in board.iterrows():
+    for i, r in metrics.iterrows():
         print(f"{i + 1:>4}  {r['model']:<26}{r['rmse_overall']:>8.4f}"
               f"{r['mae_overall']:>8.4f}   " +
               "".join(f"{r[f'rmse_{y}']:>7.4f}" for y in years))
 
-    out = args.out or Path(args.runs_dir) / "leaderboard.csv"
-    board.to_csv(out, index=False)
+    out = args.out or Path(args.runs_dir) / "model_metrics.csv"
+    metrics.to_csv(out, index=False)
     print(f"\nWrote {out}")
 
 

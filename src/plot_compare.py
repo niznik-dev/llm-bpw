@@ -112,7 +112,7 @@ def main():
         title = short_model(run["model"])
         if run["prompt"]:
             title += f"  ({run['prompt']})"
-        title += f"\n{badge(short_model(run['model']))}"  # size tier · configured-thinking
+        title += f"\n{badge(short_model(run['model']))}"  # best-flag · configured-thinking
         ax.set_title(title, fontsize=9)
         ax.grid(True, alpha=0.3)
     # Axes limits are fixed inside draw_year_lines (AGE_LIMITS / RATE_LIMITS),

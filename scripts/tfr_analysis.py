@@ -10,7 +10,7 @@ never asked for it — and compare to the HFD baseline, splitting the error into
 
 The residual dipole in the raw diff plots (deficit at the peak, surplus on the
 flanks) hints that mass is *moved, not lost*. This quantifies whether the models'
-boom-flattening conserves mass (redistributes it) or destroys it (undershoots the
+peak-flattening conserves mass (redistributes it) or destroys it (undershoots the
 total), and where displaced mass goes — younger, older, or both.
 
     python scripts/tfr_analysis.py --runs-dir data/runs/20260701 \
@@ -103,6 +103,17 @@ def ensemble_frame(matched):
     score the *crowd* exactly like an individual model (this is where the
     'tyranny of the majority' RMSE lives).
     """
+    # Guard: the mean is only apples-to-apples if every (year/cohort, age) cell
+    # averages the same models. add_residual joins each model independently, so a
+    # null drops that model from an age, thinning the average there. Warn if so.
+    n_models = matched["model"].nunique()
+    models_per_cell = matched.groupby([DIM, "age", "sex"])["model"].nunique()
+    short = models_per_cell[models_per_cell < n_models]
+    if len(short):
+        print(f"⚠ ensemble: {len(short)}/{len(models_per_cell)} ({DIM}, age) cells "
+              f"average < {n_models} models (min {int(short.min())}) — ragged "
+              "coverage skews the mean across ages.", file=sys.stderr)
+
     ens = (matched.groupby([DIM, "age", "sex"], as_index=False)
            .agg(births_per_woman=("births_per_woman", "mean"),
                 _observed=("_observed", "first")))
@@ -177,6 +188,7 @@ def report(summary, years):
     """Print the level table + a shape/displacement read for the focus key."""
     metric = METRIC[DIM]                                   # TFR (period) | CCF (cohort)
     label = DIM_LEGEND[DIM].lower()                        # 'year' | 'birth cohort'
+    # Focus column: the 1960 boom in period runs, else the middle era (cohort).
     focus = 1960 if 1960 in years else years[len(years) // 2]
 
     print(f"\n=== LEVEL — is {metric} conserved? ({metric}_model vs {metric}_real) ===")
