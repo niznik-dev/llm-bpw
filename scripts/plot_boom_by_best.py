@@ -1,13 +1,14 @@
 """Boom capture: best-available models vs weaker siblings — 1960-RMSE by is_best.
 
-Reads a leaderboard.csv (from score_models.py) and the model-metadata registry,
+Reads a model_metrics.csv (from score_models.py) and the model-metadata registry,
 and plots each model's boom-year RMSE split into two groups: the best model each
 provider offers on Together vs the weaker/older siblings we also ran. A simple
-strip (raw points + per-group mean) — no fitted trend, no correlation on made-up
-axes — so the comparison is exactly as strong as the data, no more. Points are
-colored by *configured* thinking (a confound, not a model property).
+strip (raw points + per-group mean): is_best is a binary label, so there's
+nothing continuous to fit — the comparison is exactly as strong as the two group
+means, no more. Points are colored by *configured* thinking (a confound, not a
+model property).
 
-    python scripts/plot_size_capture.py --runs-dir data/runs/20260701 --boom-col rmse_1960
+    python scripts/plot_boom_by_best.py --runs-dir data/runs/20260701 --boom-col rmse_1960
 """
 
 import argparse
@@ -31,30 +32,30 @@ def main():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--runs-dir", default="data/runs/20260701")
-    p.add_argument("--leaderboard", type=Path, default=None,
-                   help="Leaderboard CSV (default: <runs-dir>/leaderboard.csv).")
+    p.add_argument("--metrics", type=Path, default=None,
+                   help="Metrics CSV (default: <runs-dir>/model_metrics.csv).")
     p.add_argument("--boom-col", default="rmse_1960",
                    help="Which per-year RMSE column is the boom (default: %(default)s).")
     p.add_argument("--out", type=Path, default=None,
                    help="Output image (default: <runs-dir>/boom_by_best.png).")
     args = p.parse_args()
 
-    board_path = args.leaderboard or Path(args.runs_dir) / "leaderboard.csv"
-    board = pd.read_csv(board_path)
-    if args.boom_col not in board.columns:
-        raise SystemExit(f"{board_path} has no column {args.boom_col!r}; "
-                         f"columns are {list(board.columns)}.")
+    metrics_path = args.metrics or Path(args.runs_dir) / "model_metrics.csv"
+    metrics = pd.read_csv(metrics_path)
+    if args.boom_col not in metrics.columns:
+        raise SystemExit(f"{metrics_path} has no column {args.boom_col!r}; "
+                         f"columns are {list(metrics.columns)}.")
     reg = load_registry()
 
     rows = []
-    for _, r in board.iterrows():
+    for _, r in metrics.iterrows():
         m = meta_for(r["model"], reg)
         rows.append({"model": r["model"], "is_best": bool(m.get("is_best")),
                      "boom": r[args.boom_col],
                      "thinking": m.get("thinking_configured", "ambiguous")})
     df = pd.DataFrame(rows)
     if df.empty:
-        raise SystemExit("No leaderboard models found.")
+        raise SystemExit("No models found in metrics table.")
 
     fig, ax = plt.subplots(figsize=(9, 6))
     for is_best, x, _ in GROUPS:
