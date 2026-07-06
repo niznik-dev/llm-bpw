@@ -28,6 +28,28 @@ GROUPS = [(True, 0, "best available\n(provider's top on Together)"),
           (False, 1, "alt\n(weaker / older sibling)")]
 
 
+def ladder(ax, xs, ys, labels, x_label, ha, min_gap):
+    """Fan labels into an evenly-spaced vertical column beside the dots, with a
+    thin leader line from each dot to its label. Rungs are spaced >= min_gap and
+    expanded past the data range when a cluster is too tight, so no two labels
+    collide — deterministic, unlike an iterative repel. (Could be promoted to a
+    shared helper in plot_results.py if other plots want it.)"""
+    order = sorted(range(len(ys)), key=lambda i: ys[i])   # bottom->top, no crossings
+    n = len(order)
+    lo, hi = ys[order[0]], ys[order[-1]]
+    need = (n - 1) * min_gap
+    if hi - lo < need:                                    # tight cluster -> expand
+        mid = (lo + hi) / 2
+        lo, hi = mid - need / 2, mid + need / 2
+    rungs = ([lo + (hi - lo) * k / (n - 1) for k in range(n)] if n > 1
+             else [ys[order[0]]])
+    for rung, i in zip(rungs, order):
+        ax.annotate(labels[i], xy=(xs[i], ys[i]), xytext=(x_label, rung),
+                    textcoords="data", ha=ha, va="center", fontsize=7.5,
+                    arrowprops=dict(arrowstyle="-", lw=0.5, color="#999999",
+                                    shrinkA=2, shrinkB=3))
+
+
 def main():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -58,26 +80,32 @@ def main():
         raise SystemExit("No models found in metrics table.")
 
     fig, ax = plt.subplots(figsize=(9, 6))
+    min_gap = 0.062 * (df["boom"].max() - df["boom"].min())  # rung spacing floor
     for is_best, x, _ in GROUPS:
         grp = df[df["is_best"] == is_best].sort_values("boom")
         n = len(grp)
         if not n:
             continue
-        offs = [0.0] if n == 1 else [(-0.2 + 0.4 * i / (n - 1)) for i in range(n)]
-        for off, (_, row) in zip(offs, grp.iterrows()):
-            ax.scatter(x + off, row["boom"], s=110, zorder=3,
-                       color=THINK_COLOR.get(row["thinking"], "#999999"),
-                       edgecolor="black", linewidth=0.6)
-            ax.annotate(row["model"], (x + off, row["boom"]),
-                        textcoords="offset points", xytext=(0, 9),
-                        ha="center", fontsize=7.5)
+        offs = [0.0] if n == 1 else [(-0.12 + 0.24 * i / (n - 1)) for i in range(n)]
+        xs = [x + o for o in offs]
+        ys = list(grp["boom"])
+        labs = list(grp["model"])
+        cols = [THINK_COLOR.get(t, "#999999") for t in grp["thinking"]]
+        ax.scatter(xs, ys, s=110, zorder=3, color=cols, edgecolor="black", linewidth=0.6)
+        # Labels fan to the outer side (best -> left, alt -> right); mean label inner.
+        if is_best:
+            ladder(ax, xs, ys, labs, x - 0.6, "right", min_gap)
+            mean_x, mean_ha = x + 0.42, "left"
+        else:
+            ladder(ax, xs, ys, labs, x + 0.6, "left", min_gap)
+            mean_x, mean_ha = x - 0.42, "right"
         mean = grp["boom"].mean()
         ax.plot([x - 0.28, x + 0.28], [mean, mean], color="black", lw=1.6, zorder=2)
-        ax.annotate(f"mean {mean:.4f}", (x + 0.3, mean), fontsize=8, va="center")
+        ax.annotate(f"mean {mean:.4f}", (mean_x, mean), fontsize=8, va="center", ha=mean_ha)
 
     ax.set_xticks([x for _, x, _ in GROUPS])
     ax.set_xticklabels([lab for _, _, lab in GROUPS])
-    ax.set_xlim(-0.6, 1.7)
+    ax.set_xlim(-1.25, 2.25)
     ax.set_ylabel(f"{args.boom_col} — boom-year RMSE (lower = better boom capture)")
     ax.grid(True, axis="y", alpha=0.3)
 
@@ -85,7 +113,7 @@ def main():
                           markerfacecolor=THINK_COLOR[k], markeredgecolor="black",
                           label=f"thinking: {k}") for k in ["on", "off", "ambiguous"]]
     handles.append(plt.Line2D([0], [0], color="black", lw=1.6, label="group mean"))
-    ax.legend(handles=handles, fontsize=8, loc="upper left")
+    ax.legend(handles=handles, fontsize=8, loc="upper center")
 
     best_mean = df[df["is_best"]]["boom"].mean()
     alt_mean = df[~df["is_best"]]["boom"].mean()
