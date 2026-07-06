@@ -14,7 +14,21 @@ model underperforms without it:
   - ask_decimal : add a one-line "reply with only the decimal" instruction
 """
 
+import logging
 import re
+
+logger = logging.getLogger(__name__)
+
+# Global physical ceiling for a single-year, all-women ASFR. Real all-women rates
+# top out ~0.35 even in the highest-fertility populations (peak Niger ~0.31; the
+# Hutterite *marital* max ~0.55 is per-married-woman, not all-women), so a parsed
+# value above this can't be a real rate — it's a leak: a TFR (1–8 births/woman)
+# bleeding out of the reasoning, or a mis-parsed year/age (e.g. "1960" -> 1960.0).
+# We reject those to a retryable null instead of storing a bogus number.
+# NB distinct from reference.MAX_PLAUSIBLE (0.3), the Europe/Americas *analysis*
+# filter: the 0.3–0.5 gap is a "suspicious but not impossible" band we keep in raw
+# data to investigate (was the model insane, or did we parse the wrong number?).
+MAX_ASFR = 0.5
 
 # Optional one-line nudge toward a parseable answer. Minimal output hygiene, not
 # the heavy JSON schema we started with.
@@ -212,6 +226,17 @@ def parse_birth_rate(text):
     decimals = [n for n in nums if "." in n]
     pick = decimals[0] if decimals else nums[0]
     try:
-        return float(pick)
+        val = float(pick)
     except ValueError:
         return None
+    # A value above the global physical ceiling isn't a real rate — it's a leak
+    # (TFR bleed-through, or a mis-parsed year/age). Null it so retry_nulls re-queries
+    # for a clean answer, and log the raw text so the cell stays investigable even
+    # after a successful retry overwrites raw_reply (the log is the durable trail).
+    if val > MAX_ASFR:
+        logger.warning(
+            "parse leak: rejected %.4g (> MAX_ASFR %.2f) — nulling for retry; "
+            "dig in (model insane vs. mis-parsed number?): raw=%r",
+            val, MAX_ASFR, text.strip()[:120])
+        return None
+    return val
