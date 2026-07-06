@@ -37,10 +37,10 @@ def ladder(ax, xs, ys, labels, x_label, ha, min_gap):
     order = sorted(range(len(ys)), key=lambda i: ys[i])   # bottom->top, no crossings
     n = len(order)
     lo, hi = ys[order[0]], ys[order[-1]]
-    need = (n - 1) * min_gap
-    if hi - lo < need:                                    # tight cluster -> expand
+    span_needed = (n - 1) * min_gap
+    if hi - lo < span_needed:                             # tight cluster -> expand
         mid = (lo + hi) / 2
-        lo, hi = mid - need / 2, mid + need / 2
+        lo, hi = mid - span_needed / 2, mid + span_needed / 2
     rungs = ([lo + (hi - lo) * k / (n - 1) for k in range(n)] if n > 1
              else [ys[order[0]]])
     for rung, i in zip(rungs, order):
