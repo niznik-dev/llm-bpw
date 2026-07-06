@@ -10,7 +10,7 @@ never asked for it — and compare to the HFD baseline, splitting the error into
 
 The residual dipole in the raw diff plots (deficit at the peak, surplus on the
 flanks) hints that mass is *moved, not lost*. This quantifies whether the models'
-boom-flattening conserves mass (redistributes it) or destroys it (undershoots the
+peak-flattening conserves mass (redistributes it) or destroys it (undershoots the
 total), and where displaced mass goes — younger, older, or both.
 
     python scripts/tfr_analysis.py --runs-dir data/runs/20260701 \
@@ -152,8 +152,9 @@ def control_rows(summary):
 
 
 def report(summary, years):
-    """Print the level table + a shape/displacement read for the boom year."""
-    boom = 1960 if 1960 in years else years[len(years) // 2]
+    """Print the level table + a shape/displacement read for the focus year."""
+    # Focus column: the 1960 boom in period runs, else the middle era (cohort).
+    focus = 1960 if 1960 in years else years[len(years) // 2]
 
     print("\n=== LEVEL — is total fertility conserved? (TFR_model vs TFR_real) ===")
     print(f"{'model':<28}" + "".join(f"{y:>16}" for y in years))
@@ -169,10 +170,10 @@ def report(summary, years):
                 cells.append("--")
         print(f"{model:<28}" + "".join(f"{c:>16}" for c in cells))
 
-    print(f"\n=== SHAPE — where does displaced mass go? ({boom}, unit-area) ===")
+    print(f"\n=== SHAPE — where does displaced mass go? ({focus}, unit-area) ===")
     print("  peak_band_shift <0 = flattened peak · young/old_shift >0 = mass moved there")
     print(f"{'model':<28}{'peak_age':>9}{'peak':>9}{'younger':>9}{'older':>9}{'shape_rmse':>12}")
-    bd = summary[summary["year"] == boom]
+    bd = summary[summary["year"] == focus]
     for _, r in bd.iterrows():
         print(f"{r['model']:<28}{r['peak_age']:>9}{r['peak_band_shift']:>+9.3f}"
               f"{r['young_shift']:>+9.3f}{r['old_shift']:>+9.3f}{r['shape_rmse']:>12.4f}")
