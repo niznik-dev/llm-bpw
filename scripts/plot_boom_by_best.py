@@ -8,7 +8,7 @@ nothing continuous to fit — the comparison is exactly as strong as the two gro
 means, no more. Points are colored by *configured* thinking (a confound, not a
 model property).
 
-    python scripts/plot_boom_by_best.py --runs-dir data/runs/20260701 --boom-col rmse_1960
+    python scripts/plot_boom_by_best.py --runs-dir data/runs/20260701/us_period --boom-col rmse_1960
 """
 
 import argparse
@@ -53,7 +53,8 @@ def ladder(ax, xs, ys, labels, x_label, ha, min_gap):
 def main():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--runs-dir", default="data/runs/20260701")
+    p.add_argument("--runs-dir", required=True,
+                   help="Run folder, e.g. data/runs/<date>/<group>.")
     p.add_argument("--metrics", type=Path, default=None,
                    help="Metrics CSV (default: <runs-dir>/model_metrics.csv).")
     p.add_argument("--boom-col", default="rmse_1960",

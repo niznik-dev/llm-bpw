@@ -13,7 +13,7 @@ flanks) hints that mass is *moved, not lost*. This quantifies whether the models
 peak-flattening conserves mass (redistributes it) or destroys it (undershoots the
 total), and where displaced mass goes — younger, older, or both.
 
-    python scripts/tfr_analysis.py --runs-dir data/runs/20260701 \
+    python scripts/tfr_analysis.py --runs-dir data/runs/20260701/us_period \
         --real data/baselines/hfd_usa_period_asfr.csv --years 1933 1960 1990 2024
 """
 
@@ -364,7 +364,8 @@ def plot_table(full, years, out, country="?", thinking="?"):
 def main():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--runs-dir", default="data/runs/20260629")
+    p.add_argument("--runs-dir", required=True,
+                   help="Run folder to analyze, e.g. data/runs/<date>/<group>.")
     p.add_argument("--real", type=Path, default=DEFAULT_REFERENCE)
     p.add_argument("--sex", default="Female")
     p.add_argument("--years", type=int, nargs="+", default=DEFAULT_YEARS,

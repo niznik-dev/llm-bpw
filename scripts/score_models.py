@@ -5,7 +5,7 @@ age-specific fertility schedule vs the HFD baseline — overall and per calendar
 year — and writes a per-model metrics table (model_metrics.csv), sorted by
 overall RMSE.
 
-    python scripts/score_models.py --runs-dir data/runs/20260701 \
+    python scripts/score_models.py --runs-dir data/runs/20260701/us_period \
         --real data/baselines/hfd_usa_period_asfr.csv --years 1933 1960 1990 2024
 """
 
@@ -45,7 +45,8 @@ def load_runs(runs_dir, sex):
 def main():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--runs-dir", default="data/runs/20260629")
+    p.add_argument("--runs-dir", required=True,
+                   help="Run folder to score, e.g. data/runs/<date>/<group>.")
     p.add_argument("--real", type=Path, default=DEFAULT_REFERENCE)
     p.add_argument("--sex", default="Female")
     p.add_argument("--years", type=int, nargs="+", default=DEFAULT_YEARS,

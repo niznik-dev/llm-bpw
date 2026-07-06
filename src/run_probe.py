@@ -23,8 +23,9 @@ import random
 import subprocess
 from pathlib import Path
 
-# Run folders are <datestamp>/<model>_<noun> — the model says what, the random
-# noun keeps same-model same-day runs apart.
+# Run folders are <datestamp>/[<group>/]<model>_<noun> — the model says what, the
+# random noun keeps same-model same-day runs apart, and an optional --group
+# descriptor (e.g. us_period, dk_cohort) partitions same-day experiments.
 _NOUNS = ["otter", "falcon", "cedar", "comet", "harbor", "lantern", "willow",
           "quartz", "raven", "meadow", "ember", "delta", "sparrow", "cobalt",
           "marlin", "juniper", "wren", "basalt", "pylon", "tundra"]
@@ -120,17 +121,21 @@ def main():
     p.add_argument("--max-tokens", type=int, help="Override max output tokens.")
     p.add_argument("--run-name", help="Override the generated run-folder name.")
     p.add_argument("--runs-dir", default="data/runs", help="Parent of run folders (default: %(default)s).")
+    p.add_argument("--group", help="Descriptor subfolder between the datestamp and the "
+                   "model, e.g. us_period / dk_cohort. Layout: runs/<date>/<group>/<model>_<noun>/.")
     args = p.parse_args()
 
     now = datetime.datetime.now()
-    # Default layout: runs/<datestamp>/<model>_<noun>/. --run-name overrides the
-    # whole subpath (used to drop sentinels under runs/sentinel/<model>).
+    # Default layout: runs/<datestamp>/<model>_<noun>/. --group inserts a descriptor
+    # level (runs/<datestamp>/<group>/<model>_<noun>/) so same-day experiments don't
+    # collide; --run-name overrides the whole subpath (sentinels under runs/sentinel/).
     if args.run_name:
         name = args.run_name
         run_dir = Path(args.runs_dir) / name
     else:
         name = make_run_name(args.model)
-        run_dir = Path(args.runs_dir) / now.strftime("%Y%m%d") / name
+        base = Path(args.runs_dir) / now.strftime("%Y%m%d")
+        run_dir = (base / args.group / name) if args.group else (base / name)
     log_dir = run_dir / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 

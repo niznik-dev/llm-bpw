@@ -11,9 +11,9 @@ Recovery ONLY — it does not re-plot. Re-run the plot sweep afterward with the
 right --ymax/--real flags. Idempotent: only still-null rows are re-queried, so a
 second pass (optionally a bigger --factor) chips at whatever stayed null.
 
-    python scripts/retry_nulls.py data/runs/20260701
-    python scripts/retry_nulls.py data/runs/20260701 --factor 4   # quadruple tokens
-    python scripts/retry_nulls.py data/runs/20260701 --only Qwen3.6-Plus_basalt
+    python scripts/retry_nulls.py data/runs/20260701/us_period
+    python scripts/retry_nulls.py data/runs/20260701/us_period --factor 4   # quadruple tokens
+    python scripts/retry_nulls.py data/runs/20260701/us_period --only Qwen3.6-Plus_basalt
 """
 
 import argparse
