@@ -4,8 +4,8 @@ Averages births_per_woman across every model run under <runs-dir> — dropping
 implausible parse-leak outliers (> 0.3) — into one mean curve per year, with a
 shaded band (inter-model 25-75%) showing where the models agree vs disagree.
 
-    python src/plot_ensemble.py --runs-dir data/runs/20260629 --smooth 3 \
-        --out data/runs/20260629/ensemble_mean_sm3.png
+    python src/plot_ensemble.py --runs-dir data/runs/20260629/dk_period --smooth 3 \
+        --out data/runs/20260629/dk_period/ensemble_mean_sm3.png
 """
 
 import argparse
@@ -51,8 +51,8 @@ def load_all(runs_dir, sex):
 def parse_args():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--runs-dir", default="data/runs/20260629")
-    p.add_argument("--out", type=Path, default=Path("data/runs/20260629/ensemble_mean.png"))
+    p.add_argument("--runs-dir", default="data/runs/20260629/dk_period")
+    p.add_argument("--out", type=Path, default=Path("data/runs/20260629/dk_period/ensemble_mean.png"))
     p.add_argument("--sex", default="Female")
     p.add_argument("--smooth", type=int, default=1, help="Rolling-mean window; 1 = raw.")
     p.add_argument("--real", type=Path, default=DEFAULT_REFERENCE,

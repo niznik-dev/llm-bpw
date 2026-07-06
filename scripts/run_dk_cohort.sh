@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Run the Denmark COHORT probe (thread B) across the 7-model subset into a dated
-# cohort runs folder. Idempotent + resumable: skips any model that already has a
-# folder, so a failed/partial series can be re-run to fill the gaps.
+# Run the Denmark COHORT probe (thread B) across the 7-model subset into
+# runs/<date>/dk_cohort[_thinkON]/ (via --group). Idempotent + resumable: skips any
+# model that already has a folder, so a failed/partial series can be re-run to fill gaps.
 #
 #   bash scripts/run_dk_cohort.sh          # from the repo root
 #
@@ -24,13 +24,14 @@ set -u
 THINKING="${THINKING:-off}"
 GRID="data/grids/grid_denmark_cohort.csv"
 if [ "$THINKING" = "on" ]; then
-  RUNS="data/runs/$(date +%Y%m%d)_dk_cohort_thinkON"
+  GROUP="dk_cohort_thinkON"
   BUDGET="--max-tokens 50000"   # catches GLM's runaway cells (most finish ~1k)
 else
-  RUNS="data/runs/$(date +%Y%m%d)_dk_cohort"
+  GROUP="dk_cohort"
   BUDGET=""
 fi
-COMMON="--prompt cohort_baseline --grid $GRID --thinking $THINKING --runs-dir $RUNS $BUDGET"
+RUNS="data/runs/$(date +%Y%m%d)/$GROUP"   # for the skip-check + final listing
+COMMON="--prompt cohort_baseline --grid $GRID --thinking $THINKING --group $GROUP $BUDGET"
 echo "### thinking=$THINKING -> $RUNS ###"
 
 # "<together id>|<extra flags>" — streaming only where verified.
