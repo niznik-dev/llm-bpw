@@ -10,7 +10,7 @@
 # Flags per model mirror the Denmark series: streaming-only
 # tiers get --stream; heavy reasoners get a big token budget + --allow-thinking.
 set -u
-GRID="data/grid_usa.csv"
+GRID="data/grids/grid_usa.csv"
 GROUP="us_period"
 RUNS="data/runs/$(date +%Y%m%d)/$GROUP"
 

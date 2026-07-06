@@ -364,7 +364,8 @@ def plot_table(full, years, out, country="?", thinking="?"):
 def main():
     p = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--runs-dir", default="data/runs/20260629/dk_period")
+    p.add_argument("--runs-dir", required=True,
+                   help="Run folder to analyze, e.g. data/runs/<date>/<group>.")
     p.add_argument("--real", type=Path, default=DEFAULT_REFERENCE)
     p.add_argument("--sex", default="Female")
     p.add_argument("--years", type=int, nargs="+", default=DEFAULT_YEARS,
