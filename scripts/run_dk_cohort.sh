@@ -35,7 +35,8 @@ RUNS="data/runs/$(date +%Y%m%d)/$GROUP"   # for the skip-check + final listing
 COMMON="--prompt cohort_baseline --grid $GRID --thinking $THINKING --group $GROUP $BUDGET"
 echo "### thinking=$THINKING -> $RUNS ###"
 
-# "<together id>|<extra flags>" — streaming now comes from model_meta.yaml.
+# "<together id>|<extra flags>" — the per-model flag seam, same as run_us_series
+# (none needed here: thinking + token budget are set globally above via $COMMON).
 MODELS=(
   "together/Qwen/Qwen3.6-Plus|"
   "together/Qwen/Qwen3.7-Plus|"
