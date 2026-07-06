@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Run the 9-model cross-model probe on the US grid into today's runs folder.
 # Idempotent + resumable: skips any model that already has a folder under
-# runs/<today>/, so a failed/partial series can be re-run to fill the gaps.
+# runs/<today>/us_period/, so a failed/partial series can be re-run to fill gaps.
+# Layout: runs/<date>/us_period/<model>_<noun>/ (--group keeps same-day experiments
+# from colliding).
 #
 #   bash scripts/run_us_series.sh
 #
@@ -9,7 +11,8 @@
 # tiers get --stream; heavy reasoners get a big token budget + --allow-thinking.
 set -u
 GRID="data/grid_usa.csv"
-RUNS="data/runs/$(date +%Y%m%d)"
+GROUP="us_period"
+RUNS="data/runs/$(date +%Y%m%d)/$GROUP"
 
 MODELS=(
   "together/openai/gpt-oss-20b|--stream"
@@ -29,7 +32,7 @@ for entry in "${MODELS[@]}"; do
     echo "SKIP $leaf (already has a folder under $RUNS)"; continue
   fi
   echo "=== RUN $leaf : $flags ==="
-  python src/run_probe.py --model "$model" --grid "$GRID" $flags \
+  python src/run_probe.py --model "$model" --grid "$GRID" --group "$GROUP" $flags \
     || echo "!! FAILED: $leaf (continuing to next model)"
 done
 
