@@ -1,0 +1,126 @@
+# Model metadata registry — read by the plotters to annotate/group panels and to
+# compare boom-capture (esp. the 1960 RMSE) for best-available vs weaker siblings.
+#
+# Keyed by the SHORT model name (what short_model() yields: the last path segment
+# of the together/... id, matching the run-folder + leaderboard names).
+#
+# is_best — the ONE size/quality axis we keep. True = this is the best model from
+#   its provider that is available on Together; False = a deliberately-included
+#   weaker/older sibling. Binary and objective — no cross-vendor "size tier"
+#   guessing (a Gemma "large" 31B and a Qwen "flagship" 1T are not comparable, so
+#   S/M/L/XL was arbitrary). The only False entries are the siblings we ran
+#   alongside a provider's top model: gpt-oss-20b (vs 120b) and Qwen 3.6/3.7-Plus
+#   (vs 3.7-Max). Providers where we ran a single model → their Together flagship.
+#
+# PARAMS — informational only, NOT a tier basis. params_total_b / params_active_b
+#   in billions (active = per-token for MoE; = total for dense). params_confidence:
+#   published (vendor/model-card figure) · estimated (undisclosed; inferred).
+#
+# thinking_configured — the thinking state WE ELICITED, not a model default:
+#   our run's `disable_thinking` flag cross-referenced with whether the family
+#   honors the /no_think switch (only Qwen does). Confounded with model identity
+#   (findings-doc caveat) — read it as "how we ran it," not "what the model is."
+#     on        = disable_thinking:False + a real token budget (we let it reason)
+#     off       = /no_think sent AND honored (Qwen family only)
+#     ambiguous = /no_think sent but ignored (non-Qwen) -> reasoned in a 512 budget
+#
+# cost_tier — $/$$/$$$ (Together pricing); null = not yet pulled (don't fabricate).
+
+gpt-oss-120b:
+  provider: OpenAI
+  is_best: true                    # vs the smaller gpt-oss-20b we also ran
+  params_total_b: 117
+  params_active_b: 5.1
+  moe: true
+  params_confidence: published
+  thinking_configured: ambiguous
+  cost_tier: null
+  notes: open-weight MoE (128 experts, top-4); best OpenAI model on Together
+
+gpt-oss-20b:
+  provider: OpenAI
+  is_best: false                   # smaller sibling of gpt-oss-120b
+  params_total_b: 21
+  params_active_b: 3.6
+  moe: true
+  params_confidence: published
+  thinking_configured: ambiguous
+  cost_tier: null
+  notes: open-weight MoE (32 experts, top-4); smallest in the panel
+
+Qwen3.7-Max:
+  provider: Alibaba
+  is_best: true                    # top of the Qwen ladder (Flash < Plus < Max)
+  params_total_b: 1000             # Qwen3-Max confirmed 1T+ total (Sept 2025)
+  params_active_b: 50              # active undisclosed; estimate
+  moe: true
+  params_confidence: estimated
+  thinking_configured: off
+  cost_tier: null
+  notes: proprietary 1T+ MoE flagship (Max). Version 3.7 speculative, tier stable
+
+Qwen3.7-Plus:
+  provider: Alibaba
+  is_best: false                   # Plus < Max (mid tier)
+  params_total_b: 300              # undisclosed; ~200-400B MoE by price/latency analogy
+  params_active_b: 20              # undisclosed; ~15-25B
+  moe: true
+  params_confidence: estimated
+  thinking_configured: off
+  cost_tier: null
+  notes: proprietary size; mid tier (Plus)
+
+Qwen3.6-Plus:
+  provider: Alibaba
+  is_best: false                   # older gen + Plus < Max
+  params_total_b: 300
+  params_active_b: 20
+  moe: true
+  params_confidence: estimated
+  thinking_configured: off
+  cost_tier: null
+  notes: proprietary size; mid tier, prior gen. NB reads the 1960 boom best in the panel
+
+gemma-4-31B-it:
+  provider: Google
+  is_best: true                    # Gemma 4 flagship dense on Together
+  params_total_b: 31
+  params_active_b: 31              # dense -> active = total
+  moe: false
+  params_confidence: published
+  thinking_configured: on          # disable_thinking:False, 1024-token budget
+  cost_tier: null
+  notes: open-weight dense; Gemma 4 flagship dense (released 2026-03)
+
+MiniMax-M3:
+  provider: MiniMax
+  is_best: true                    # MiniMax runs one flagship line
+  params_total_b: 427
+  params_active_b: 26
+  moe: true
+  params_confidence: published     # ~427B/26B (vLLM); SiliconFlow lists 428B/23B
+  thinking_configured: ambiguous
+  cost_tier: null
+  notes: open-weight MoE flagship (released 2026-06)
+
+nemotron-3-ultra-550b-a55b:
+  provider: NVIDIA
+  is_best: true                    # Ultra = top of Nano < Super < Ultra
+  params_total_b: 550              # NVIDIA launch language ~500B total / ~50B active
+  params_active_b: 55
+  moe: true
+  params_confidence: estimated     # "~500B/~50B" approx until final weights publish
+  thinking_configured: on          # disable_thinking:False, 4096-token budget
+  cost_tier: null
+  notes: open-weight hybrid latent-MoE Ultra tier; largest total in the panel
+
+GLM-5.2:
+  provider: Zhipu
+  is_best: true                    # GLM flagship (Flash < Air < full)
+  params_total_b: 750              # ~744-753B across sources
+  params_active_b: 40
+  moe: true
+  params_confidence: published
+  thinking_configured: on          # disable_thinking:False, 4096-token budget
+  cost_tier: null
+  notes: open-weight MoE flagship (released 2026-06)
