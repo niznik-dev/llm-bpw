@@ -15,7 +15,6 @@
 #
 # STREAMING QUIRK (also verified): Qwen *requires* --stream (else 400
 # streaming_required); MiniMax-M3 *hangs* with --stream, so it runs non-streamed.
-# gpt-oss dropped (weak boom-readers, not worth the cost).
 #
 # Cohort grid = data/grids/grid_denmark_cohort.csv (cohorts 1933/1945/1955/1974,
 # Shared-A). Baseline for scoring = data/baselines/hfd_denmark_cohort_asfr.csv.

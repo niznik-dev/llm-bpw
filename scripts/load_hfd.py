@@ -17,13 +17,13 @@ Vienna Institute of Demography) — cite it wherever these curves appear.
     # Period (default): Denmark calendar years
     python scripts/load_hfd.py               # -> data/baselines/hfd_denmark_period_asfr.csv
     python scripts/load_hfd.py --src data/hfd_raw/USAasfrRR.txt --country "United States" \
-        --keys 1933 1960 1990 2024 --out data/baselines/hfd_usa_period_asfr.csv
+        --years 1933 1960 1990 2024 --out data/baselines/hfd_usa_period_asfr.csv
 
     # Cohort: birth cohorts (pick completed ones)
     python scripts/load_hfd.py --src data/hfd_raw/DNKasfrVH.txt \
-        --keys 1935 1945 1960 1975 --out data/baselines/hfd_denmark_cohort_asfr.csv
+        --years 1935 1945 1960 1975 --out data/baselines/hfd_denmark_cohort_asfr.csv
 
-The anchor (earliest) key is whatever you pass first in --keys. For period, pick
+The anchor (earliest) key is whatever you pass first in --years. For period, pick
 each country's earliest solid pre-boom year (Denmark 1920, USA 1933). For cohort,
 pick completed cohorts (recent cohorts still have missing rates at older ages).
 """
@@ -33,7 +33,7 @@ from pathlib import Path
 
 import pandas as pd
 
-DEFAULT_KEYS = [1920, 1960, 1990, 2024]  # Denmark period years; override with --keys
+DEFAULT_KEYS = [1920, 1960, 1990, 2024]  # Denmark period years; override with --years
 AGES = list(range(10, 56))  # match the model grid (10-55 inclusive)
 FERTILE = range(12, 50)     # ages that must be present for a "complete" schedule
                             # (through 49 ~ HFD's own completed-cohort convention)
@@ -50,7 +50,7 @@ def main():
     p.add_argument("--src", type=Path, default=Path("data/hfd_raw/DNKasfrRR.txt"),
                    help="HFD ASFR file — period (asfrRR) or cohort (asfrVH) "
                         "(default: %(default)s).")
-    p.add_argument("--keys", "--years", dest="keys", type=int, nargs="+",
+    p.add_argument("--years", dest="keys", type=int, nargs="+",
                    default=DEFAULT_KEYS,
                    help="Values of the file's first dimension to keep — calendar "
                         "YEARS for period files, birth COHORTS for cohort files; "
