@@ -21,7 +21,11 @@ import datetime
 import json
 import random
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling src modules
+from model_meta import stream_for  # noqa: E402
 
 # Run folders are <datestamp>/[<group>/]<model>_<noun> — the model says what, the
 # random noun keeps same-model same-day runs apart, and an optional --group
@@ -107,7 +111,8 @@ def main():
                         "(de-risk a new model before the full run).")
     p.add_argument("--device", help="hf/ device, e.g. mps or auto (omit for hosted APIs).")
     p.add_argument("--stream", action="store_true",
-                   help="Force streaming (some Together models, e.g. *-Plus, require it).")
+                   help="Force streaming for models NOT in model_meta.yaml (e.g. hf/ "
+                        "local). Registry models stream per their `stream:` entry.")
     p.add_argument("--allow-thinking", action="store_true",
                    help="Legacy /no_think toggle: don't append /no_think (hf/ "
                         "local models). Superseded by --thinking for Together.")
@@ -156,7 +161,19 @@ def main():
         cmd += ["--limit", str(args.limit)]
     if args.device:
         cmd += ["-M", f"device={args.device}"]
-    if args.stream:
+    # Streaming is a per-model Together fact (model_meta.yaml `stream`): stream
+    # unless the model is 'forbidden'; --stream only forces it for unlisted models.
+    mode = stream_for(short_model(args.model))
+    if mode == "forbidden":
+        if args.stream:
+            print(f"NB: --stream ignored — {short_model(args.model)} hangs when "
+                  "streamed (stream: forbidden).")
+        do_stream = False
+    elif mode in ("required", "either"):
+        do_stream = True
+    else:  # unlisted (e.g. hf/ local) — honor the flag
+        do_stream = args.stream
+    if do_stream:
         cmd += ["-M", "stream=true"]
     if args.allow_thinking:
         cmd += ["-T", "disable_thinking=false"]

@@ -7,23 +7,23 @@
 #
 #   bash scripts/run_us_series.sh
 #
-# Flags per model mirror the Denmark series: streaming-only
-# tiers get --stream; heavy reasoners get a big token budget + --allow-thinking.
+# Streaming comes from model_meta.yaml (run_probe applies it per model); heavy
+# reasoners still get a big token budget + --allow-thinking here.
 set -u
 GRID="data/grids/grid_usa.csv"
 GROUP="us_period"
 RUNS="data/runs/$(date +%Y%m%d)/$GROUP"
 
 MODELS=(
-  "together/openai/gpt-oss-20b|--stream"
-  "together/openai/gpt-oss-120b|--stream"
-  "together/Qwen/Qwen3.6-Plus|--stream"
-  "together/Qwen/Qwen3.7-Plus|--stream"
-  "together/Qwen/Qwen3.7-Max|--stream"
-  "together/MiniMaxAI/MiniMax-M3|--stream"
+  "together/openai/gpt-oss-20b|"
+  "together/openai/gpt-oss-120b|"
+  "together/Qwen/Qwen3.6-Plus|"
+  "together/Qwen/Qwen3.7-Plus|"
+  "together/Qwen/Qwen3.7-Max|"
+  "together/MiniMaxAI/MiniMax-M3|"
   "together/google/gemma-4-31B-it|--allow-thinking --max-tokens 1024"
-  "together/nvidia/nemotron-3-ultra-550b-a55b|--stream --allow-thinking --max-tokens 4096"
-  "together/zai-org/GLM-5.2|--stream --allow-thinking --max-tokens 4096"
+  "together/nvidia/nemotron-3-ultra-550b-a55b|--allow-thinking --max-tokens 4096"
+  "together/zai-org/GLM-5.2|--allow-thinking --max-tokens 4096"
 )
 
 for entry in "${MODELS[@]}"; do

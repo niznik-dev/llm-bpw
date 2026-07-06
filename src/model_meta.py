@@ -72,3 +72,10 @@ def thinking_extra_body(model, state, registry=None):
     (e.g. an hf/ local model), so the caller can fall back to the /no_think path.
     """
     return meta_for(model, registry).get(f"thinking_{state}") or {}
+
+
+def stream_for(model, registry=None):
+    """Together streaming constraint: 'required' | 'forbidden' | 'either', or None
+    if the model isn't in the registry (e.g. an hf/ local model). run_probe streams
+    unless 'forbidden'; None means fall back to the --stream flag."""
+    return meta_for(model, registry).get("stream")
