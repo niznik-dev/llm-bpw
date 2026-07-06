@@ -23,9 +23,15 @@
 #   Verified 2026-07-02: Qwen/Gemma/Nemotron -> chat_template_kwargs.enable_thinking;
 #   GLM-5.x -> reasoning.enabled; MiniMax-M3 -> thinking.type. All default to
 #   thinking ON except Gemma. gpt-oss dropped from the cohort work (no control here).
+#
+# stream — Together streaming constraint: required (400 without it) | forbidden
+#   (hangs with it) | either. run_probe streams UNLESS forbidden; the --stream flag
+#   only affects models not listed here (e.g. hf/ local). Verified 2026-07-02:
+#   Qwen *-Plus/Max required, MiniMax-M3 forbidden, the rest either.
 
 gpt-oss-120b:
   provider: OpenAI
+  stream: either
   cost_output_per_mtok: null
   is_best: true                    # vs the smaller gpt-oss-20b we also ran
   params_total_b: 117
@@ -37,6 +43,7 @@ gpt-oss-120b:
 
 gpt-oss-20b:
   provider: OpenAI
+  stream: either
   cost_output_per_mtok: null
   is_best: false                   # smaller sibling of gpt-oss-120b
   params_total_b: 21
@@ -48,6 +55,7 @@ gpt-oss-20b:
 
 Qwen3.7-Max:
   provider: Alibaba
+  stream: required                 # 400 streaming_required without --stream
   cost_output_per_mtok: 3.75
   is_best: true                    # top of the Qwen ladder (Flash < Plus < Max)
   params_total_b: 1000             # Qwen3-Max confirmed 1T+ total (Sept 2025)
@@ -61,6 +69,7 @@ Qwen3.7-Max:
 
 Qwen3.7-Plus:
   provider: Alibaba
+  stream: required                 # 400 streaming_required without --stream
   cost_output_per_mtok: 1.28
   is_best: false                   # Plus < Max (mid tier)
   params_total_b: 300              # undisclosed; ~200-400B MoE by price/latency analogy
@@ -74,6 +83,7 @@ Qwen3.7-Plus:
 
 Qwen3.6-Plus:
   provider: Alibaba
+  stream: required                 # 400 streaming_required without --stream
   cost_output_per_mtok: 3.00       # priced high — vendor nudging users off the prior gen
   is_best: false                   # older gen + Plus < Max
   params_total_b: 300
@@ -87,6 +97,7 @@ Qwen3.6-Plus:
 
 gemma-4-31B-it:
   provider: Google
+  stream: either
   cost_output_per_mtok: 0.97       # cheapest in the panel
   is_best: true                    # Gemma 4 flagship dense on Together
   params_total_b: 31
@@ -100,6 +111,7 @@ gemma-4-31B-it:
 
 MiniMax-M3:
   provider: MiniMax
+  stream: forbidden                # hangs when streamed — must run non-streamed
   cost_output_per_mtok: 1.20
   is_best: true                    # MiniMax runs one flagship line
   params_total_b: 427
@@ -113,6 +125,7 @@ MiniMax-M3:
 
 nemotron-3-ultra-550b-a55b:
   provider: NVIDIA
+  stream: either
   cost_output_per_mtok: 3.60
   is_best: true                    # Ultra = top of Nano < Super < Ultra
   params_total_b: 550              # NVIDIA launch language ~500B total / ~50B active
@@ -126,6 +139,7 @@ nemotron-3-ultra-550b-a55b:
 
 GLM-5.2:
   provider: Zhipu
+  stream: either
   cost_output_per_mtok: 4.40       # most expensive in the panel
   is_best: true                    # GLM flagship (Flash < Air < full)
   params_total_b: 750              # ~744-753B across sources

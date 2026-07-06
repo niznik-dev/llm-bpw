@@ -13,8 +13,9 @@
 #   GLM-5.2                 -> reasoning.enabled=false
 #   MiniMax-M3              -> thinking.type=disabled
 #
-# STREAMING QUIRK (also verified): Qwen *requires* --stream (else 400
-# streaming_required); MiniMax-M3 *hangs* with --stream, so it runs non-streamed.
+# STREAMING is driven by model_meta.yaml `stream:` (verified 2026-07-02: Qwen
+# *-Plus/Max required, MiniMax-M3 forbidden) — run_probe applies it, so this runner
+# no longer passes --stream per model.
 #
 # Cohort grid = data/grids/grid_denmark_cohort.csv (cohorts 1933/1945/1955/1974,
 # Shared-A). Baseline for scoring = data/baselines/hfd_denmark_cohort_asfr.csv.
@@ -34,13 +35,13 @@ RUNS="data/runs/$(date +%Y%m%d)/$GROUP"   # for the skip-check + final listing
 COMMON="--prompt cohort_baseline --grid $GRID --thinking $THINKING --group $GROUP $BUDGET"
 echo "### thinking=$THINKING -> $RUNS ###"
 
-# "<together id>|<extra flags>" — streaming only where verified.
+# "<together id>|<extra flags>" — streaming now comes from model_meta.yaml.
 MODELS=(
-  "together/Qwen/Qwen3.6-Plus|--stream"
-  "together/Qwen/Qwen3.7-Plus|--stream"
-  "together/Qwen/Qwen3.7-Max|--stream"
-  "together/google/gemma-4-31B-it|--stream"
-  "together/nvidia/nemotron-3-ultra-550b-a55b|--stream"
+  "together/Qwen/Qwen3.6-Plus|"
+  "together/Qwen/Qwen3.7-Plus|"
+  "together/Qwen/Qwen3.7-Max|"
+  "together/google/gemma-4-31B-it|"
+  "together/nvidia/nemotron-3-ultra-550b-a55b|"
   "together/zai-org/GLM-5.2|"
   "together/MiniMaxAI/MiniMax-M3|"
 )
