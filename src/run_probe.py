@@ -215,10 +215,15 @@ def main():
         header = not log.exists()
         with open(log, "a") as fh:
             if header:
-                fh.write("timestamp\trun\tmodel\tkey\tage\n")
+                fh.write("timestamp\trun\tmodel\tkey\tage\traw_reply\n")
             for r in nulls.itertuples():
+                # Log the raw reply (one line, truncated) so a leak-null (a rejected
+                # value like 3.0 or a mis-parsed 1960) is distinguishable at a glance
+                # from a genuinely empty null — without grepping the run log.
+                rr = getattr(r, "raw_reply", "")
+                rr = "" if pd.isna(rr) else " ".join(str(rr).split())[:80]
                 fh.write(f"{now:%Y%m%d_%H%M%S}\t{name}\t{args.model}\t"
-                         f"{getattr(r, dim)}\t{r.age}\n")
+                         f"{getattr(r, dim)}\t{r.age}\t{rr}\n")
         print(f"  logged {len(nulls)} null(s) to {log}")
 
 

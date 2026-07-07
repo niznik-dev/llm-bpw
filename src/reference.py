@@ -11,8 +11,13 @@ import pandas as pd
 
 DEFAULT_REFERENCE = Path("data/baselines/hfd_denmark_period_asfr.csv")
 
-# Real ASFR peaks below ~0.2; a model value above this is a parse leak (e.g. a
-# TFR that slipped out of the reasoning) and would otherwise blow up a residual.
+# Analysis-layer plausibility filter for OUR scope: Europe + the Americas, all
+# low-to-moderate fertility and all in HFD (the real single-year peak is US 1960 at
+# ~0.267). A model value above this is implausible *for these countries*, so we drop
+# it from residuals to keep a stray high value from dominating the axis. Distinct
+# from probe.MAX_ASFR (0.5), the global physical parse-time reject: true leaks (>0.5)
+# never reach here (they're nulled + retried at the source), so what this drops is
+# the 0.3–0.5 "suspicious but not impossible" band — worth investigating, not a leak.
 MAX_PLAUSIBLE = 0.3
 
 # A schedule's "line dimension" — the field identifying one curve: calendar

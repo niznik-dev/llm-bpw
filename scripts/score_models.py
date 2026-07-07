@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from probe import MAX_ASFR  # noqa: E402
 from reference import (DEFAULT_REFERENCE, MAX_PLAUSIBLE, add_residual,  # noqa: E402
                        line_dim, load_reference)
 
@@ -61,7 +62,10 @@ def main():
         raise SystemExit(f"Baseline {args.real} missing — run scripts/load_hfd.py.")
     country = ref["country"].iloc[0] if "country" in ref.columns else "?"
     big = load_runs(args.runs_dir, args.sex)
-    big = big[big["births_per_woman"] <= MAX_PLAUSIBLE]  # drop parse leaks
+    # Drop the 0.3–0.5 "suspicious" band from residuals (implausible for our
+    # Europe/Americas scope, but not a leak — true leaks >0.5 were nulled at parse).
+    dropped = int((big["births_per_woman"] > MAX_PLAUSIBLE).sum())
+    big = big[big["births_per_woman"] <= MAX_PLAUSIBLE]
 
     dim = line_dim(big)  # 'year' (period) or 'cohort' — per-key RMSE columns follow
     rows = []
@@ -78,7 +82,8 @@ def main():
     metrics = pd.DataFrame(rows).sort_values("rmse_overall").reset_index(drop=True)
 
     print(f"\nScored {len(metrics)} models vs HFD ({args.sex}, {country})  ·  "
-          f"parse leaks > {MAX_PLAUSIBLE} dropped\n")
+          f"{dropped} in the {MAX_PLAUSIBLE}–{MAX_ASFR} suspicious band dropped "
+          f"from residuals (leaks > {MAX_ASFR} nulled at parse)\n")
     print("=== Model metrics · sorted by RMSE (lower = better) ===")
     print(f"{'rank':>4}  {'model':<26}{'RMSE':>8}{'MAE':>8}   " +
           "".join(f"{y:>7}" for y in years))
